@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}HemoNexus - Register New Account | Donor & Patient Registration{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+
+{% block public_content %}
+<div class="auth-page-wrapper d-flex align-center justify-center min-vh-100 py-5">
+  <div class="container" style="max-width: 560px; position: relative; z-index: 2;">
+    
+    <!-- Brand / Eyebrow (Stagger 1) -->
+    <div class="text-center mb-4 stagger-entrance-1">
+      <a href="/home" class="brand-wrapper d-inline-flex align-center justify-center gap-2 mb-2" aria-label="HemoNexus Home">
+        <div class="brand-icon-container">
+          <div class="brand-icon">
+            <i class="fa-solid fa-droplet"></i>
+          </div>
+          <span class="brand-status-pulse" title="System Connected"></span>
+        </div>
+        <span class="fs-4 fw-bold" style="font-family: var(--font-heading); color: var(--ink);">Hemo<span style="color: var(--crimson);">Nexus</span></span>
+      </a>
+      <div>
+        <span class="badge badge-teal">
+          <i class="fa-solid fa-user-plus"></i> Join the Life-Saving Network
+        </span>
+      </div>
+    </div>
+
+    <!-- Register Card -->
+    <div class="card auth-card shadow-lg border-0">
+      
+      <!-- Card Header (Stagger 2) -->
+      <div class="card-header bg-white border-0 pt-4 pb-2 px-4 text-center stagger-entrance-2">
+        <h1 class="h3 fw-bold mb-1" id="registerHeaderTitle">Create Account</h1>
+        <p class="text-muted small mb-3" id="registerHeaderSubtitle">Join thousands of verified donors and emergency hospital networks</p>
+
+        <!-- Role Toggle Pills -->
+        <div class="role-pill-toggle-container mx-auto" role="tablist" aria-label="Registration User Type">
+          <button type="button" 
+                  class="role-pill-btn {% if active_role != 'patient' %}active{% endif %}" 
+                  id="regToggleDonorBtn" 
+                  onclick="HemoAuth.switchRegRole('donor')">
+            <i class="fa-solid fa-heart-pulse me-1"></i> Register as Donor
+          </button>
+          <button type="button" 
+                  class="role-pill-btn {% if active_role == 'patient' %}active{% endif %}" 
+                  id="regTogglePatientBtn" 
+                  onclick="HemoAuth.switchRegRole('patient')">
+            <i class="fa-solid fa-user-injured me-1"></i> Register as Patient / Hospital
+          </button>
+        </div>
+      </div>
+
+      <!-- Form (Stagger 3 & 4) -->
+      <div class="card-body px-4 pt-2 pb-4">
+        <form action="/register" method="POST" id="authRegisterForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleRegSubmit(event)">
+          <input type="hidden" name="userRole" id="regRoleInput" value="{{ active_role or 'donor' }}">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Full Legal Name *</label>
+              <input type="text" class="form-control" name="name" placeholder="e.g. Dr. Rohan Sharma" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Mobile Number *</label>
+              <input type="tel" class="form-control" name="phone" placeholder="+91 98765 43210" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Email Address *</label>
+            <input type="email" class="form-control" name="email" placeholder="name@example.com" required>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Blood Group *</label>
+              <select class="form-select text-mono" name="bloodGroup" required>
+                <option value="O-">O Negative (Universal)</option>
+                <option value="O+">O Positive</option>
+                <option value="A-">A Negative</option>
+                <option value="A+">A Positive</option>
+                <option value="B-">B Negative</option>
+                <option value="B+">B Positive</option>
+                <option value="AB-">AB Negative</option>
+                <option value="AB+">AB Positive</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">City / Area *</label>
+              <input type="text" class="form-control" name="city" placeholder="Mumbai, Andheri West" required>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label small fw-semibold">Security Password *</label>
+            <input type="password" class="form-control" name="password" placeholder="Create strong password" required>
+          </div>
+
+          <!-- Submit Button with Heartbeat Loading Spinner (Requirement 5) -->
+          <button type="submit" class="btn btn-primary w-100 btn-lg d-flex align-center justify-center gap-2" id="registerSubmitBtn">
+            <span>Complete Registration</span>
+            <i class="fa-solid fa-check"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- Footer -->
+      <div class="card-footer bg-light px-4 py-3 text-center border-top">
+        <p class="small text-muted mb-0">
+          Already have an account? 
+          <a href="/login" class="fw-semibold text-primary">Sign In here</a>
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}

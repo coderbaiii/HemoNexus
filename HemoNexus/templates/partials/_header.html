@@ -1,0 +1,35 @@
+<!-- HemoNexus Top Navigation Bar -->
+<header class="app-header">
+  <div class="header-left">
+    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle Navigation">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+    <div class="header-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search donors, requests, hospitals... (Ctrl+K)" id="globalSearchInput">
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Quick Emergency SOS Button -->
+    <a href="/emergency" class="btn btn-emergency btn-sm animate-pulse-sos">
+      <i class="fa-solid fa-truck-medical"></i>
+      <span>Code-Red SOS</span>
+    </a>
+
+    <!-- Notifications Bell -->
+    <button class="notification-bell-btn" title="Live Alerts" onclick="HemoUI.showToast('Urgent Alert', 'Critical O- inventory low at Lilavati Hospital.', 'warning')">
+      <i class="fa-regular fa-bell"></i>
+      <span class="bell-badge"></span>
+    </button>
+
+    <!-- User Profile Dropdown -->
+    <div class="header-user" onclick="HemoUI.showToast('HemoNexus Admin', 'Logged in as Dr. Aditi Rao (Blood Bank Coordinator)', 'info')">
+      <div class="user-avatar">AR</div>
+      <div class="user-info">
+        <span class="user-name">Dr. Aditi Rao</span>
+        <span class="user-role">Blood Bank Lead</span>
+      </div>
+    </div>
+  </div>
+</header>

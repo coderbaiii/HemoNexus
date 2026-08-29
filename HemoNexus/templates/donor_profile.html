@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Donor Profile - {{ donor.name }} | HemoNexus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-center gap-3">
+    <a href="/donors" class="btn btn-outline btn-sm">
+      <i class="fa-solid fa-arrow-left"></i> Back to Directory
+    </a>
+    <div>
+      <h1 class="page-title">{{ donor.name }}</h1>
+      <p class="page-subtitle">Donor Identification: <span class="text-mono fw-bold">{{ donor.id }}</span></p>
+    </div>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary" onclick="openContactModal('{{ donor.name }}', '{{ donor.bloodGroup }}', '{{ donor.phone }}', '{{ donor.area }}')">
+      <i class="fa-solid fa-phone"></i> Contact Donor
+    </button>
+  </div>
+</div>
+
+<!-- Profile Card Shell -->
+<div class="card mb-6 overflow-hidden">
+  <div class="profile-cover"></div>
+  <div class="d-flex align-end justify-between p-6 flex-wrap gap-4" style="margin-top: -50px; position: relative;">
+    <div class="d-flex align-end gap-4 flex-wrap">
+      <div class="profile-avatar-large">
+        {{ donor.name[:2] | upper if donor.name is defined else 'DN' }}
+      </div>
+      <div style="margin-bottom: 0.5rem;">
+        <div class="d-flex align-center gap-2">
+          <h2 class="text-2xl fw-extrabold text-slate-900">{{ donor.name }}</h2>
+          {% if donor.verified %}
+            <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Verified Donor</span>
+          {% endif %}
+        </div>
+        <p class="text-xs text-muted"><i class="fa-solid fa-location-dot text-primary"></i> {{ donor.area }}, {{ donor.city }} • Registered since 2024</p>
+      </div>
+    </div>
+
+    <div class="d-flex align-center gap-3" style="margin-bottom: 0.5rem;">
+      <div class="blood-badge blood-badge-lg">{{ donor.bloodGroup }}</div>
+      <div>
+        <span class="status-chip {% if donor.status == 'available' %}available{% else %}cooldown{% endif %}">
+          {{ donor.status | title }}
+        </span>
+        <div class="text-xs text-muted mt-1">{{ donor.totalDonations }} Lifetime Donations</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Profile 2-Column Grid -->
+<div class="d-grid gap-6" style="grid-template-columns: 2fr 1fr;">
+  
+  <!-- Left Column: Medical Vitals & Donation Timeline -->
+  <div class="d-flex flex-column gap-6">
+    
+    <!-- Medical Eligibility & Vitals -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Medical Eligibility & Health Vitals</h3>
+        <span class="badge badge-info"><i class="fa-solid fa-stethoscope"></i> Clinical Assessment</span>
+      </div>
+      <div class="card-body">
+        <div class="d-grid grid-3 gap-4 mb-6">
+          <div class="p-3 rounded-lg" style="background-color: var(--slate-50); border: 1px solid var(--border-color);">
+            <div class="text-xs text-muted text-uppercase fw-semibold">Hemoglobin</div>
+            <div class="text-xl fw-extrabold text-slate-900 mt-1">{{ donor.hemoglobin or '15.2 g/dL' }}</div>
+            <span class="text-xs text-success"><i class="fa-solid fa-check"></i> Normal Range</span>
+          </div>
+
+          <div class="p-3 rounded-lg" style="background-color: var(--slate-50); border: 1px solid var(--border-color);">
+            <div class="text-xs text-muted text-uppercase fw-semibold">Weight</div>
+            <div class="text-xl fw-extrabold text-slate-900 mt-1">{{ donor.weightKg or 74 }} kg</div>
+            <span class="text-xs text-success"><i class="fa-solid fa-check"></i> Meets Requirement (>50kg)</span>
+          </div>
+
+          <div class="p-3 rounded-lg" style="background-color: var(--slate-50); border: 1px solid var(--border-color);">
+            <div class="text-xs text-muted text-uppercase fw-semibold">Blood Pressure</div>
+            <div class="text-xl fw-extrabold text-slate-900 mt-1">{{ donor.bloodPressure or '120/80 mmHg' }}</div>
+            <span class="text-xs text-success"><i class="fa-solid fa-check"></i> Optimal</span>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-lg" style="background-color: var(--primary-50); border: 1px solid var(--primary-200);">
+          <div class="d-flex align-center justify-between">
+            <div>
+              <h4 class="text-sm fw-bold text-primary-900">90-Day Donation Cooldown Status</h4>
+              <p class="text-xs text-primary-700">Last donated on <strong>{{ donor.lastDonatedDate }}</strong>. Fully eligible for Whole Blood & Apheresis donation.</p>
+            </div>
+            <span class="badge badge-success">Eligible</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Donation History Timeline -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Donation History Timeline</h3>
+        <span class="badge badge-slate">{{ donor.totalDonations }} Total Records</span>
+      </div>
+      <div class="card-body p-6">
+        <div class="timeline-track">
+          <div class="timeline-node">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="d-flex align-center justify-between mb-1">
+                <span class="fw-bold text-slate-900">Whole Blood Donation (1 Unit)</span>
+                <span class="text-xs text-muted">{{ donor.lastDonatedDate }}</span>
+              </div>
+              <p class="text-xs text-slate-600 mb-2">Hospital: Lilavati Hospital Blood Center • Batch #WB-9941</p>
+              <span class="badge badge-success"><i class="fa-solid fa-certificate"></i> Verified Certificate Issued</span>
+            </div>
+          </div>
+
+          <div class="timeline-node">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="d-flex align-center justify-between mb-1">
+                <span class="fw-bold text-slate-900">Emergency Platelet Donation (SDP)</span>
+                <span class="text-xs text-muted">2025-11-14</span>
+              </div>
+              <p class="text-xs text-slate-600 mb-2">Hospital: Tata Memorial Cancer Institute • Emergency SOS response</p>
+              <span class="badge badge-success"><i class="fa-solid fa-certificate"></i> Verified Certificate Issued</span>
+            </div>
+          </div>
+
+          <div class="timeline-node">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <div class="d-flex align-center justify-between mb-1">
+                <span class="fw-bold text-slate-900">Whole Blood Voluntary Camp</span>
+                <span class="text-xs text-muted">2025-07-20</span>
+              </div>
+              <p class="text-xs text-slate-600 mb-2">Location: Red Cross Community Camp Bandra</p>
+              <span class="badge badge-success"><i class="fa-solid fa-certificate"></i> Verified Certificate Issued</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right Column: Contact & Availability Controls -->
+  <div class="d-flex flex-column gap-6">
+    
+    <!-- Contact Details Card -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Contact & Communication</h3>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-column gap-3 mb-4">
+          <div>
+            <span class="text-xs text-muted">Primary Phone</span>
+            <div class="text-sm fw-bold text-slate-900">{{ donor.phone }}</div>
+          </div>
+          <div>
+            <span class="text-xs text-muted">Email Address</span>
+            <div class="text-sm fw-bold text-slate-900">{{ donor.email }}</div>
+          </div>
+          <div>
+            <span class="text-xs text-muted">Residential Location</span>
+            <div class="text-sm fw-bold text-slate-900">{{ donor.area }}, {{ donor.city }}</div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-column gap-2">
+          <a href="tel:{{ donor.phone }}" class="btn btn-primary justify-center">
+            <i class="fa-solid fa-phone"></i> Voice Call
+          </a>
+          <a href="https://wa.me/{{ donor.phone | replace('+', '') | replace(' ', '') }}" target="_blank" class="btn btn-success justify-center" style="background-color: #25D366; border-color: #25D366;">
+            <i class="fa-brands fa-whatsapp"></i> WhatsApp Message
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reliability & Response Score -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Reliability Index</h3>
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-center justify-between mb-2">
+          <span class="text-sm fw-semibold text-slate-800">Response Rate</span>
+          <span class="text-sm fw-bold text-success">{{ donor.responseRate }}%</span>
+        </div>
+        <div class="inventory-bar-track mb-4">
+          <div class="inventory-bar-fill" style="width: {{ donor.responseRate }}%; background-color: var(--success);"></div>
+        </div>
+
+        <div class="d-flex align-center justify-between mb-2">
+          <span class="text-sm fw-semibold text-slate-800">Average Reach ETA</span>
+          <span class="text-sm fw-bold text-primary">~15 Mins</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

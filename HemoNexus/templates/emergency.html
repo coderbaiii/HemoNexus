@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Code-Red Emergency SOS Broadcast - HemoNexus{% endblock %}
+
+{% block content %}
+<!-- Emergency Banner Alert Header -->
+<div class="emergency-banner-alert">
+  <div class="d-flex align-center justify-between flex-wrap gap-4" style="position: relative; z-index: 2;">
+    <div class="d-flex align-center gap-3">
+      <div class="brand-icon" style="background: #ffffff; color: var(--danger); width: 3rem; height: 3rem; font-size: 1.5rem;">
+        <i class="fa-solid fa-radiation animate-pulse-sos"></i>
+      </div>
+      <div>
+        <h1 class="text-2xl fw-extrabold text-white m-0">Code-Red Emergency Broadcast Center</h1>
+        <p class="text-xs text-slate-200 mt-1 m-0">Multi-channel instant alert broadcast across SMS, WhatsApp, and Mobile Push to all verified compatible donors.</p>
+      </div>
+    </div>
+    <div class="d-flex align-center gap-2">
+      <span class="badge" style="background: rgba(255,255,255,0.2); color: #ffffff; border: 1px solid rgba(255,255,255,0.4);">
+        <i class="fa-solid fa-satellite-dish animate-pulse-dot"></i> Network Ready
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Main Emergency Grid -->
+<div class="d-grid gap-6" style="grid-template-columns: 1fr 1fr;">
+  
+  <!-- Left Column: Broadcast Dispatcher Console -->
+  <div class="card">
+    <div class="card-header bg-slate-50">
+      <div class="d-flex align-center gap-2">
+        <i class="fa-solid fa-bullhorn text-danger text-lg"></i>
+        <h3 class="card-title">Broadcast Dispatcher Configuration</h3>
+      </div>
+    </div>
+
+    <!-- Trigger Form -->
+    <div class="card-body p-6" id="broadcastTriggerCard">
+      <div class="form-group">
+        <label class="form-label">Critical Blood Group Required *</label>
+        <select class="form-select" id="emergencyBloodGroup">
+          <option value="O-">O- (Universal Red Cell Donor - Critical)</option>
+          <option value="O+">O+</option>
+          <option value="A-">A-</option>
+          <option value="A+">A+</option>
+          <option value="B-">B-</option>
+          <option value="B+">B+</option>
+          <option value="AB-">AB-</option>
+          <option value="AB+">AB+</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Component Required *</label>
+        <select class="form-select" id="emergencyComponent">
+          <option value="Whole Blood">Whole Blood (Standard)</option>
+          <option value="Platelets">Single Donor Platelets (SDP)</option>
+          <option value="Plasma">Fresh Frozen Plasma (FFP)</option>
+          <option value="RBC">Packed Red Blood Cells (PRBC)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Broadcast Geographic Radius</label>
+        <select class="form-select" id="emergencyRadius">
+          <option value="5">Within 5 km (~10-15 mins ETA)</option>
+          <option value="10" selected>Within 10 km (~20-30 mins ETA)</option>
+          <option value="25">Within 25 km (Regional Metropolitan)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Destination Hospital ICU</label>
+        <input type="text" class="form-control" value="Lilavati Hospital & Research Centre, Bandra" readonly>
+      </div>
+
+      <button type="button" id="btnTriggerBroadcast" class="btn btn-emergency btn-lg w-full mt-4 justify-center">
+        <i class="fa-solid fa-satellite-dish"></i> Transmit Code-Red Broadcast Now
+      </button>
+    </div>
+
+    <!-- Active Broadcast State (Hidden until broadcast) -->
+    <div class="card-body p-6 d-none" id="broadcastActiveState">
+      <div class="p-4 rounded-xl text-center mb-4" style="background: var(--slate-900); color: #ffffff;">
+        <span class="badge badge-danger mb-2 animate-pulse-sos">Live Transmission Active</span>
+        <div class="text-3xl fw-extrabold text-danger" id="emergencyTimer">09:48</div>
+        <p class="text-xs text-slate-400 mt-1">Countdown to next escalation tier</p>
+      </div>
+
+      <div class="d-flex align-center justify-between p-3 rounded-lg border mb-4">
+        <span class="text-xs text-muted fw-semibold text-uppercase">Donors Alerted</span>
+        <span class="text-sm fw-bold text-slate-900">42 Verified Donors</span>
+      </div>
+
+      <div class="d-flex align-center justify-between p-3 rounded-lg border mb-4">
+        <span class="text-xs text-muted fw-semibold text-uppercase">Responses Received</span>
+        <span class="text-sm fw-extrabold text-success" id="liveResponseCount">0</span>
+      </div>
+
+      <button class="btn btn-outline-primary w-full" onclick="location.reload()">
+        <i class="fa-solid fa-rotate-right"></i> Reset & Re-configure
+      </button>
+    </div>
+  </div>
+
+  <!-- Right Column: Live Inbound Response Stream -->
+  <div class="card">
+    <div class="card-header">
+      <div class="d-flex align-center gap-2">
+        <h3 class="card-title">Live Inbound Donor Responses</h3>
+        <span class="badge badge-success"><i class="fa-solid fa-circle-dot animate-pulse-dot"></i> Live Stream</span>
+      </div>
+    </div>
+
+    <div class="card-body p-6 live-donor-response-feed" id="emergencyResponseList">
+      <div class="empty-state">
+        <div class="empty-state-icon">
+          <i class="fa-solid fa-tower-broadcast"></i>
+        </div>
+        <div class="empty-state-title">Awaiting Emergency Broadcast</div>
+        <p class="empty-state-desc">Click "Transmit Code-Red Broadcast" to blast immediate push & SMS alerts to eligible donors.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/emergency.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,821 @@
+/* ==========================================================================
+   HemoNexus Page-Specific Visual Styles
+   Theme: Dark Navy Medical-Tech Interface
+   Features: Hero Polish, Interactive Compatibility Visualizer, Animated Stats, ECG Motif
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Landing Page & Header (Dark Navy)
+   -------------------------------------------------------------------------- */
+.landing-body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+}
+
+.landing-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg-header);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-color);
+  z-index: var(--z-header);
+}
+
+.landing-nav {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+}
+
+.brand-icon-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand-status-pulse {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--teal-500);
+  border: 2px solid var(--bg-app);
+  animation: pulseStatusDot 2s infinite ease-in-out;
+}
+
+.landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  list-style: none;
+}
+
+.landing-nav-links a {
+  color: var(--slate-300);
+  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  transition: color var(--transition-fast);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.landing-nav-links a:hover {
+  color: #FFFFFF;
+}
+
+/* --------------------------------------------------------------------------
+   2. Hero Section (Dark Medical-Tech Depth)
+   -------------------------------------------------------------------------- */
+.hero-section {
+  padding: 5rem 0 4rem;
+  background: radial-gradient(circle at 85% 20%, rgba(200, 30, 58, 0.12) 0%, rgba(14, 22, 40, 0.6) 45%, var(--bg-app) 80%);
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.4rem 0.95rem;
+  border-radius: var(--radius-full);
+  background-color: rgba(200, 30, 58, 0.12);
+  border: 1px solid rgba(200, 30, 58, 0.35);
+  color: #FFA4B2;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.hero-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  display: inline-block;
+}
+
+.hero-title {
+  font-family: var(--font-heading);
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.12;
+  color: #FFFFFF;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.hero-title .crimson-accent {
+  color: #FF4D6D;
+  font-style: italic;
+}
+
+.hero-subtitle {
+  font-family: var(--font-family);
+  font-size: var(--text-lg);
+  color: var(--slate-300);
+  max-width: 560px;
+  line-height: 1.65;
+  margin-bottom: 2.25rem;
+}
+
+.hero-trust-indicators span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: var(--weight-medium);
+  color: var(--slate-400);
+}
+
+/* Hero Quick Search Card (Dark Elevated Glass Surface) */
+.hero-quick-search-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-2xl);
+  padding: 2.25rem;
+  box-shadow: var(--shadow-xl);
+  position: relative;
+}
+
+.hero-blood-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}
+
+.hero-blood-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--slate-200);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  user-select: none;
+}
+
+.hero-blood-tile input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero-blood-tile:hover {
+  border-color: var(--primary);
+  background-color: rgba(200, 30, 58, 0.08);
+  color: #FFFFFF;
+}
+
+.hero-blood-tile.selected,
+.hero-blood-tile:has(input[type="radio"]:checked) {
+  border-color: var(--primary);
+  background-color: rgba(200, 30, 58, 0.18);
+  color: #FFA4B2;
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.hero-blood-tile:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   3. Signature ECG Heartbeat Motif (Feature 3)
+   -------------------------------------------------------------------------- */
+.ecg-divider-container {
+  width: 100%;
+  background: #090E1C;
+  padding: 1rem 0 1.5rem;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ecg-label-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: var(--weight-semibold);
+  color: var(--slate-400);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+.ecg-label-tag .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  display: inline-block;
+}
+
+.ecg-svg-track {
+  width: 100%;
+  height: 48px;
+  stroke: rgba(255, 255, 255, 0.08);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ecg-pulse-line {
+  stroke: #FF3355;
+  stroke-width: 2.2;
+  stroke-dasharray: 220 800;
+  stroke-dashoffset: 1020;
+  filter: drop-shadow(0 0 6px rgba(255, 51, 85, 0.7));
+  animation: ecgSweep 4s linear infinite;
+}
+
+@keyframes ecgSweep {
+  0% {
+    stroke-dashoffset: 1020;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecg-pulse-line {
+    animation: none !important;
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   4. Animated Statistics Section (Feature 2)
+   -------------------------------------------------------------------------- */
+.stats-section {
+  padding: 3.5rem 0 4.5rem;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.stat-metric-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.stat-metric-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-highlight);
+}
+
+.stat-number-display {
+  font-family: var(--font-mono);
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.375rem;
+  display: flex;
+  align-items: baseline;
+}
+
+.stat-number-display.crimson {
+  color: #FF4D6D;
+  text-shadow: 0 0 20px rgba(200, 30, 58, 0.4);
+}
+
+.stat-number-display.teal {
+  color: var(--teal-text);
+  text-shadow: 0 0 20px rgba(14, 124, 107, 0.4);
+}
+
+.stat-metric-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: #FFFFFF;
+  margin-bottom: 0.25rem;
+}
+
+.stat-metric-desc {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   5. Interactive Blood Compatibility Visualizer (Feature 1)
+   -------------------------------------------------------------------------- */
+.visualizer-section {
+  padding: 5rem 0;
+  background-color: var(--bg-app);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.visualizer-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 3rem;
+}
+
+.visualizer-header h2 {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: #FFFFFF;
+  margin-bottom: 0.75rem;
+}
+
+/* Selector Bar */
+.compat-selector-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-2xl);
+  padding: 1.75rem;
+  margin-bottom: 2.5rem;
+  box-shadow: var(--shadow-md);
+}
+
+.compat-selector-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--slate-300);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.compat-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.75rem;
+}
+
+.compat-selector-btn {
+  background: var(--bg-input);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  min-height: 70px;
+}
+
+.compat-selector-btn .group-text {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  font-size: 1.15rem;
+  color: #FFFFFF;
+  line-height: 1;
+}
+
+.compat-selector-btn .group-sub {
+  font-size: 0.65rem;
+  font-weight: var(--weight-semibold);
+  color: var(--slate-400);
+  text-transform: uppercase;
+}
+
+.compat-selector-btn:hover {
+  border-color: var(--primary);
+  background-color: rgba(200, 30, 58, 0.12);
+  transform: translateY(-1px);
+}
+
+.compat-selector-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.compat-selector-btn.active {
+  background-color: var(--primary);
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-crimson);
+  transform: translateY(-1px);
+}
+
+.compat-selector-btn.active .group-text {
+  color: #FFFFFF;
+}
+
+.compat-selector-btn.active .group-sub {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Dual Column Visualizer Grid */
+.compat-matrix-display {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.compat-column-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.compat-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.compat-column-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.compat-column-title h3 {
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.compat-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+/* Individual Compatibility Tiles */
+.compat-tile {
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: all var(--transition-fast);
+  border: 1.5px solid transparent;
+  min-height: 80px;
+}
+
+/* Compatible State -> Uses HemoNexus Teal (#0E7C6B) strictly */
+.compat-tile.is-compatible {
+  background-color: var(--teal-surface);
+  border-color: var(--teal-border);
+  color: var(--teal-text-light);
+  box-shadow: 0 2px 10px rgba(14, 124, 107, 0.2);
+}
+
+.compat-tile.is-compatible .tile-blood {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  font-size: 1.15rem;
+  color: var(--teal-text-light);
+}
+
+.compat-tile.is-compatible .tile-status {
+  font-size: 0.65rem;
+  font-weight: var(--weight-bold);
+  color: var(--teal-text);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+/* Incompatible State -> Muted & Softened */
+.compat-tile.is-incompatible {
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1.5px dashed rgba(255, 255, 255, 0.12);
+  opacity: 0.38;
+  color: var(--slate-500);
+}
+
+.compat-tile.is-incompatible .tile-blood {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-medium);
+  font-size: 1.15rem;
+  color: var(--slate-500);
+}
+
+.compat-tile.is-incompatible .tile-status {
+  font-size: 0.65rem;
+  font-weight: var(--weight-medium);
+  color: var(--slate-500);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+/* Clinical Summary Note Box */
+.compat-clinical-note {
+  background: var(--bg-card);
+  border: 1px solid var(--border-highlight);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  box-shadow: var(--shadow-md);
+}
+
+.compat-note-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--teal-surface);
+  color: var(--teal-text);
+  border: 1px solid var(--teal-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.compat-note-content {
+  flex: 1;
+}
+
+.compat-note-title {
+  font-family: var(--font-heading);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: #FFFFFF;
+  margin-bottom: 0.25rem;
+}
+
+.compat-note-text {
+  font-size: var(--text-xs);
+  color: var(--slate-300);
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.compat-disclaimer {
+  font-size: 0.7rem;
+  color: var(--slate-400);
+  font-style: italic;
+}
+
+/* --------------------------------------------------------------------------
+   6. Matching Engine Visuals (Dark Navy)
+   -------------------------------------------------------------------------- */
+.match-score-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 4.75rem;
+  height: 4.75rem;
+  border-radius: var(--radius-xl);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.match-score-high {
+  background-color: var(--teal-surface);
+  color: var(--teal-text-light);
+  border-color: var(--teal-border);
+}
+
+.match-score-medium {
+  background-color: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+
+.match-score-low {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+.match-candidate-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+  margin-bottom: 1rem;
+}
+
+.match-candidate-card:hover {
+  border-color: var(--border-highlight);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.match-reasons-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.reason-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-xs);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--slate-200);
+  font-weight: var(--weight-medium);
+  border: 1px solid var(--border-color);
+}
+
+/* --------------------------------------------------------------------------
+   7. Code Red / Emergency Broadcast Center
+   -------------------------------------------------------------------------- */
+.emergency-banner-alert {
+  background: linear-gradient(135deg, #7F1424 0%, #C81E3A 100%);
+  color: #FFFFFF;
+  border-radius: var(--radius-xl);
+  padding: 1.5rem 2rem;
+  box-shadow: var(--shadow-emergency);
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.emergency-broadcast-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background-color: #060A14;
+  color: #FFFFFF;
+  border-radius: var(--radius-lg);
+  margin-top: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.live-donor-response-feed {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* --------------------------------------------------------------------------
+   8. Donor Profile & Medical Timeline
+   -------------------------------------------------------------------------- */
+.profile-cover {
+  height: 140px;
+  background: linear-gradient(135deg, #7F1424 0%, #111B30 100%);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  position: relative;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  margin-top: -50px;
+  margin-left: 2rem;
+  display: inline-block;
+}
+
+.profile-avatar-large {
+  width: 100px;
+  height: 100px;
+  border-radius: var(--radius-full);
+  border: 4px solid var(--bg-card);
+  background-color: var(--bg-surface-elevated);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: 700;
+  color: #FFA4B2;
+}
+
+.timeline-track {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--border-color);
+}
+
+.timeline-node {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -2rem;
+  top: 0.25rem;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--bg-card);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 2px rgba(200, 30, 58, 0.3);
+}
+
+.timeline-content {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+}
+
+/* --------------------------------------------------------------------------
+   9. Responsive Adaptations
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .hero-title {
+    font-size: 2.75rem;
+  }
+  .compat-selector-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .compat-matrix-display {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 3rem 0 2rem;
+  }
+  .hero-title {
+    font-size: 2.25rem;
+  }
+  .hero-quick-search-card {
+    padding: 1.5rem;
+  }
+  .compat-selector-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .compat-tiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

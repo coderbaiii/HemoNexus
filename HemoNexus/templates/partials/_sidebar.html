@@ -1,0 +1,91 @@
+<!-- HemoNexus Sidebar Navigation -->
+<aside class="app-sidebar" id="appSidebar">
+  <!-- Brand -->
+  <div class="sidebar-brand">
+    <div class="brand-icon-container" style="position: relative;">
+      <div class="brand-icon" style="background: var(--primary);">
+        <i class="fa-solid fa-droplet"></i>
+      </div>
+      <span class="brand-status-pulse" title="System Live & Connected"></span>
+    </div>
+    <div class="brand-text">
+      <div class="title" style="font-family: var(--font-heading);">Hemo<span style="color: var(--primary);">Nexus</span></div>
+      <div class="tagline">Smart Blood Network</div>
+    </div>
+  </div>
+
+  <!-- Menu Content -->
+  <div class="sidebar-content">
+    <div>
+      <div class="sidebar-section-title">Core Operations</div>
+      <ul class="sidebar-menu">
+        <li>
+          <a href="/dashboard" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="/donors" class="sidebar-link {% if active_page == 'donors' %}active{% endif %}">
+            <i class="fa-solid fa-users"></i>
+            <span>Donor Management</span>
+            <span class="sidebar-badge badge-primary">Active</span>
+          </a>
+        </li>
+        <li>
+          <a href="/requests" class="sidebar-link {% if active_page == 'requests' %}active{% endif %}">
+            <i class="fa-solid fa-notes-medical"></i>
+            <span>Blood Requests</span>
+            <span class="sidebar-badge badge-danger">3 Urgent</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="sidebar-section-title">Smart Matching & Emergency</div>
+      <ul class="sidebar-menu">
+        <li>
+          <a href="/match" class="sidebar-link {% if active_page == 'match' %}active{% endif %}">
+            <i class="fa-solid fa-wand-magic-sparkles text-primary"></i>
+            <span>Smart Match Engine</span>
+          </a>
+        </li>
+        <li>
+          <a href="/emergency" class="sidebar-link emergency-link {% if active_page == 'emergency' %}active{% endif %}">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Code-Red Broadcast</span>
+          </a>
+        </li>
+        <li>
+          <a href="/availability" class="sidebar-link {% if active_page == 'availability' %}active{% endif %}">
+            <i class="fa-solid fa-calendar-check"></i>
+            <span>Availability & Cooldown</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="sidebar-section-title">Public Portal</div>
+      <ul class="sidebar-menu">
+        <li>
+          <a href="/" class="sidebar-link {% if active_page == 'landing' %}active{% endif %}">
+            <i class="fa-solid fa-house"></i>
+            <span>Landing & Seeker Portal</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Sidebar Footer Status -->
+  <div class="sidebar-footer">
+    <div class="d-flex align-center justify-between">
+      <div class="d-flex align-center gap-2">
+        <span class="status-chip available">System Online</span>
+      </div>
+      <span class="text-xs text-muted">v2.4.0</span>
+    </div>
+  </div>
+</aside>

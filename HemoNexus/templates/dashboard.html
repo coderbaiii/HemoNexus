@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - HemoNexus Central Command{% endblock %}
+
+{% block content %}
+<div id="dashboardRoot">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Operations Command Center</h1>
+      <p class="page-subtitle">Real-time donor availability, blood inventory status, and urgent matching pipeline.</p>
+    </div>
+    <div class="page-actions">
+      <a href="/requests/new" class="btn btn-outline-primary">
+        <i class="fa-solid fa-plus"></i> New Blood Request
+      </a>
+      <button class="btn btn-secondary" data-modal-target="addDonorModal">
+        <i class="fa-solid fa-user-plus"></i> Register Donor
+      </button>
+      <a href="/match" class="btn btn-primary">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Requirement Matcher
+      </a>
+    </div>
+  </div>
+
+  <!-- Critical Alert Ticker -->
+  <div class="card mb-6" style="border-left: 4px solid var(--danger); background-color: var(--primary-50);">
+    <div class="card-body p-4 d-flex align-center justify-between flex-wrap gap-3">
+      <div class="d-flex align-center gap-3">
+        <span class="badge badge-danger"><i class="fa-solid fa-triangle-exclamation"></i> Critical Alert</span>
+        <span class="text-sm fw-bold text-slate-900">Lilavati Hospital ICU urgently requires 3 units of O- Whole Blood (REQ-4091).</span>
+      </div>
+      <a href="/emergency" class="btn btn-emergency btn-sm">
+        <i class="fa-solid fa-broadcast-tower"></i> Launch Emergency SOS
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI Metric Cards Grid -->
+  <div class="d-grid grid-4 gap-4 mb-6">
+    <div class="stat-card">
+      <div>
+        <div class="stat-label">Available Donors</div>
+        <div class="stat-value" id="statAvailableDonors">--</div>
+        <div class="stat-trend text-success">
+          <i class="fa-solid fa-arrow-trend-up"></i> +4 registered today
+        </div>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-success">
+        <i class="fa-solid fa-users"></i>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div>
+        <div class="stat-label">Active Requests</div>
+        <div class="stat-value" id="statActiveRequests">--</div>
+        <div class="stat-trend text-warning">
+          <i class="fa-solid fa-clock"></i> 2 in matching pipeline
+        </div>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-warning">
+        <i class="fa-solid fa-notes-medical"></i>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div>
+        <div class="stat-label">Critical Shortages</div>
+        <div class="stat-value text-danger" id="statCriticalRequests">--</div>
+        <div class="stat-trend text-danger">
+          <i class="fa-solid fa-circle-exclamation"></i> O-, AB- Low Supply
+        </div>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-primary">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div>
+        <div class="stat-label">Fulfilled Today</div>
+        <div class="stat-value text-teal-600" id="statFulfilled">--</div>
+        <div class="stat-trend text-teal-600">
+          <i class="fa-solid fa-circle-check"></i> 100% On-time target
+        </div>
+      </div>
+      <div class="stat-icon-wrapper stat-icon-teal">
+        <i class="fa-solid fa-heart-circle-check"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main 2-Column Dashboard Grid -->
+  <div class="d-grid gap-6" style="grid-template-columns: 2fr 1fr;">
+    
+    <!-- Left Column: Active Requests & Inventory Visualizer -->
+    <div class="d-flex flex-column gap-6">
+      
+      <!-- Active Urgent Requests -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Priority Blood Requests Pipeline</h3>
+            <p class="card-subtitle">Live status of critical and urgent patient requirements</p>
+          </div>
+          <a href="/requests" class="btn btn-outline btn-sm">View All Requests</a>
+        </div>
+        <div class="table-container" style="border: none; border-radius: 0;">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Patient & Hospital</th>
+                <th>Blood Needed</th>
+                <th>Urgency</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for req in requests %}
+              <tr>
+                <td>
+                  <div class="fw-bold text-slate-900">{{ req.patientName }}</div>
+                  <div class="text-xs text-muted"><i class="fa-solid fa-hospital text-primary"></i> {{ req.hospital }}</div>
+                </td>
+                <td>
+                  <div class="d-flex align-center gap-2">
+                    <span class="blood-badge blood-badge-sm">{{ req.bloodGroup }}</span>
+                    <div>
+                      <div class="text-xs fw-semibold text-slate-800">{{ req.unitsNeeded }} Units • {{ req.component }}</div>
+                      <div class="text-xs text-muted">{{ req.unitsFulfilled }}/{{ req.unitsNeeded }} fulfilled</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  {% if req.urgency == 'critical' %}
+                    <span class="urgency-chip urgency-critical"><i class="fa-solid fa-circle-radiation"></i> Critical SOS</span>
+                  {% elif req.urgency == 'urgent' %}
+                    <span class="urgency-chip urgency-urgent"><i class="fa-solid fa-clock"></i> Urgent</span>
+                  {% else %}
+                    <span class="urgency-chip urgency-routine">Routine</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if req.status == 'in-progress' %}
+                    <span class="badge badge-info"><i class="fa-solid fa-spinner animate-spin"></i> In Progress</span>
+                  {% elif req.status == 'matched' %}
+                    <span class="badge badge-warning"><i class="fa-solid fa-user-check"></i> Matched</span>
+                  {% elif req.status == 'fulfilled' %}
+                    <span class="badge badge-success"><i class="fa-solid fa-check"></i> Fulfilled</span>
+                  {% else %}
+                    <span class="badge badge-slate">Pending</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="/match?group={{ req.bloodGroup }}&component={{ req.component }}" class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Match
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Real-Time Blood Stock Inventory Visualizer -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Live Blood Reserve Stock Index</h3>
+            <p class="card-subtitle">Threshold monitoring across 8 standard blood antigen groups</p>
+          </div>
+          <span class="badge badge-slate">Updated 5 mins ago</span>
+        </div>
+        <div class="card-body">
+          <div id="bloodInventoryGrid" class="d-grid grid-2 gap-4">
+            <!-- Populated dynamically by dashboard.js -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Live Activity Feed & Quick Actions -->
+    <div class="d-flex flex-column gap-6">
+      
+      <!-- Quick Dispatch Launcher -->
+      <div class="card" style="background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%); color: #ffffff;">
+        <div class="card-body p-5">
+          <div class="d-flex align-center gap-3 mb-3">
+            <div class="brand-icon" style="background: var(--primary);">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div>
+              <h4 class="text-white fw-extrabold m-0">Instant Match Engine</h4>
+              <p class="text-xs text-slate-300 m-0">Algorithm-based donor discovery</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-300 mb-4">
+            Input requirement parameters to calculate exact antigen compatibility, response history, and GPS radius score.
+          </p>
+          <a href="/match" class="btn btn-primary w-full justify-center">
+            <i class="fa-solid fa-crosshairs"></i> Launch Matching Workspace
+          </a>
+        </div>
+      </div>
+
+      <!-- Live Recent Activity Feed -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Recent Activity Feed</h3>
+          <span class="badge badge-success"><i class="fa-solid fa-circle-dot animate-pulse-dot"></i> Live</span>
+        </div>
+        <div class="card-body p-4">
+          <ul class="activity-feed-list" id="dashboardActivityList">
+            {% for act in activities %}
+            <li class="activity-item">
+              <div class="activity-icon {{ act.iconClass }}">
+                <i class="fa-solid {{ act.icon }}"></i>
+              </div>
+              <div>
+                <div class="activity-title">{{ act.title }}</div>
+                <p class="text-xs text-slate-600 mb-1">{{ act.desc }}</p>
+                <span class="activity-meta"><i class="fa-regular fa-clock"></i> {{ act.time }}</span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
