@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Console — HEMONEXAS{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.8rem; color: var(--text-main);">Administrator Oversight Console</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">System metrics, 6-month verification lifecycle management, and audit logs.</p>
+  </div>
+  <div>
+    <button id="runSweepBtn" class="btn btn-warning" onclick="runVerificationSweep()">
+      &#128337; Run 6-Month Verification Sweep
+    </button>
+  </div>
+</div>
+
+<!-- System Metrics -->
+<div class="grid-4" style="margin-bottom: 2rem;">
+  <div class="stat-box">
+    <div id="statTotalDonors" class="stat-num">-</div>
+    <div class="stat-label">Total Registered Donors</div>
+  </div>
+  <div class="stat-box">
+    <div id="statActiveDonors" class="stat-num" style="color: var(--success);">-</div>
+    <div class="stat-label">Active & Verified Donors</div>
+  </div>
+  <div class="stat-box">
+    <div id="statDueDonors" class="stat-num" style="color: var(--warning);">-</div>
+    <div class="stat-label">Verification Due Donors</div>
+  </div>
+  <div class="stat-box">
+    <div id="statInactiveDonors" class="stat-num" style="color: var(--danger);">-</div>
+    <div class="stat-label">Inactive Donors (Excluded)</div>
+  </div>
+</div>
+
+<!-- Tabs for Management -->
+<div class="card">
+  <div class="card-header">
+    <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+      <button class="btn btn-outline btn-sm admin-tab active" onclick="switchTab('donors')">Donors Directory</button>
+      <button class="btn btn-outline btn-sm admin-tab" onclick="switchTab('requests')">Blood Requests</button>
+      <button class="btn btn-outline btn-sm admin-tab" onclick="switchTab('responses')">Dispatches & Responses</button>
+      <button class="btn btn-outline btn-sm admin-tab" onclick="switchTab('users')">All Users</button>
+    </div>
+  </div>
+
+  <!-- Donors Section -->
+  <div id="tabDonors">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+      <h3 class="card-title">Donor Lifecycle & Verification Records</h3>
+      <div style="display: flex; gap: 0.5rem;">
+        <select id="donorStatusFilter" class="form-control" style="width: auto;" onchange="loadAdminDonors()">
+          <option value="">All Statuses</option>
+          <option value="ACTIVE">Active Only</option>
+          <option value="VERIFICATION_DUE">Verification Due Only</option>
+          <option value="INACTIVE">Inactive Only</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="loadAdminDonors()">Refresh</button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table" id="donorsTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Donor Name</th>
+            <th>Blood Group</th>
+            <th>Phone</th>
+            <th>Location</th>
+            <th>Availability</th>
+            <th>Status</th>
+            <th>Next Due Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="donorsTableBody">
+          <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading donors...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Blood Requests Section -->
+  <div id="tabRequests" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 class="card-title">System-Wide Blood Requests</h3>
+      <button class="btn btn-outline btn-sm" onclick="loadAdminRequests()">Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table" id="requestsTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Patient</th>
+            <th>Blood Group</th>
+            <th>Units</th>
+            <th>Hospital</th>
+            <th>Urgency</th>
+            <th>Status</th>
+            <th>Date Created</th>
+          </tr>
+        </thead>
+        <tbody id="requestsTableBody">
+          <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading requests...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Responses Section -->
+  <div id="tabResponses" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 class="card-title">Donor Dispatch Communications & Responses</h3>
+      <button class="btn btn-outline btn-sm" onclick="loadAdminResponses()">Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table" id="responsesTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Blood Req</th>
+            <th>Hospital</th>
+            <th>Patient</th>
+            <th>Donor</th>
+            <th>Status</th>
+            <th>Message</th>
+            <th>Updated At</th>
+          </tr>
+        </thead>
+        <tbody id="responsesTableBody">
+          <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading responses...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- All Users Section -->
+  <div id="tabUsers" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 class="card-title">Registered Users</h3>
+      <button class="btn btn-outline btn-sm" onclick="loadAdminUsers()">Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table" id="usersTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody">
+          <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading users...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+<script>
+  initAdminDashboard();
+</script>
+{% endblock %}

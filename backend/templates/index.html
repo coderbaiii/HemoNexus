@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}HEMONEXAS — Smart Blood Donor Management & Requirement-Based Matching{% endblock %}
+
+{% block content %}
+<div class="card" style="background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%); border-left: 6px solid var(--primary); padding: 2.5rem 2rem;">
+  <h1 style="font-size: 2.4rem; color: var(--primary-dark); margin-bottom: 0.8rem;">
+    Every Second Counts in Blood Emergencies.
+  </h1>
+  <p style="font-size: 1.15rem; color: var(--text-main); max-width: 780px; margin-bottom: 1.5rem;">
+    <strong>HEMONEXAS</strong> is an intelligent, location-aware blood donor management platform with continuous profile verification, multi-factor requirement matching, and direct emergency dispatch.
+  </p>
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    {% if not session.get('user_id') %}
+      <a href="{{ url_for('web.register_page') }}" class="btn btn-primary" style="padding: 0.75rem 1.6rem; font-size: 1rem;">
+        Register as Donor or Patient
+      </a>
+      <a href="{{ url_for('web.login_page') }}" class="btn btn-outline" style="padding: 0.75rem 1.6rem; font-size: 1rem;">
+        Sign In to Portal
+      </a>
+    {% else %}
+      {% if session.get('role') == 'donor' %}
+        <a href="{{ url_for('web.donor_dashboard') }}" class="btn btn-primary" style="padding: 0.75rem 1.6rem; font-size: 1rem;">
+          Go to Donor Dashboard &rarr;
+        </a>
+      {% elif session.get('role') == 'patient' %}
+        <a href="{{ url_for('web.patient_dashboard') }}" class="btn btn-primary" style="padding: 0.75rem 1.6rem; font-size: 1rem;">
+          Go to Patient Blood Requests &rarr;
+        </a>
+      {% elif session.get('role') == 'admin' %}
+        <a href="{{ url_for('web.admin_dashboard') }}" class="btn btn-primary" style="padding: 0.75rem 1.6rem; font-size: 1rem;">
+          Open Admin Console &rarr;
+        </a>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Key Pillars -->
+<h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--text-main);">Platform Core Capabilities</h2>
+<div class="grid-3" style="margin-bottom: 2rem;">
+  <div class="card">
+    <div style="font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--primary);">&#128337;</div>
+    <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">6-Month Verification Lifecycle</h3>
+    <p style="font-size: 0.9rem; color: var(--text-muted);">
+      Donors are required to re-confirm availability and location every 6 months. Inactive and unverified profiles are automatically excluded from emergency matching.
+    </p>
+  </div>
+
+  <div class="card">
+    <div style="font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--secondary);">&#129517;</div>
+    <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">7-Step Smart Matching Engine</h3>
+    <p style="font-size: 0.9rem; color: var(--text-muted);">
+      Filters by exact blood group, active status, availability schedule (24h, 8h, daytime, nighttime), and mutual travel distance limits, ranked by a multi-factor score.
+    </p>
+  </div>
+
+  <div class="card">
+    <div style="font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--success);">&#128227;</div>
+    <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">Direct Request & Response</h3>
+    <p style="font-size: 0.9rem; color: var(--text-muted);">
+      Patients can send targeted donation invitations directly to top-ranked matching donors. Donors review hospital details and respond with one click.
+    </p>
+  </div>
+</div>
+
+<!-- Workflow Diagram -->
+<div class="card" style="padding: 2rem;">
+  <h3 class="card-title" style="margin-bottom: 1rem;">End-to-End Operational Workflow</h3>
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; text-align: center;">
+    <div style="flex: 1; min-width: 140px; padding: 1rem; background: #edf2f7; border-radius: 8px;">
+      <div style="font-weight: 700; color: var(--primary);">1. Register</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Donor or Patient account</div>
+    </div>
+    <div style="font-size: 1.3rem; color: var(--text-muted);">&rarr;</div>
+    <div style="flex: 1; min-width: 140px; padding: 1rem; background: #edf2f7; border-radius: 8px;">
+      <div style="font-weight: 700; color: var(--primary);">2. Verify</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">6-month active cycle</div>
+    </div>
+    <div style="font-size: 1.3rem; color: var(--text-muted);">&rarr;</div>
+    <div style="flex: 1; min-width: 140px; padding: 1rem; background: #edf2f7; border-radius: 8px;">
+      <div style="font-weight: 700; color: var(--primary);">3. Patient Request</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Blood group & hospital</div>
+    </div>
+    <div style="font-size: 1.3rem; color: var(--text-muted);">&rarr;</div>
+    <div style="flex: 1; min-width: 140px; padding: 1rem; background: #edf2f7; border-radius: 8px;">
+      <div style="font-weight: 700; color: var(--primary);">4. Match & Rank</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Availability & distance</div>
+    </div>
+    <div style="font-size: 1.3rem; color: var(--text-muted);">&rarr;</div>
+    <div style="flex: 1; min-width: 140px; padding: 1rem; background: #edf2f7; border-radius: 8px;">
+      <div style="font-weight: 700; color: var(--primary);">5. Donor Response</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">Acceptance & center release</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

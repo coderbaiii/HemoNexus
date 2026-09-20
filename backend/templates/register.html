@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Create an Account — HEMONEXAS{% endblock %}
+
+{% block content %}
+<div style="max-width: 580px; margin: 2rem auto;">
+  <div class="card" style="padding: 2rem;">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <span style="font-size: 2.5rem; color: var(--primary);">&#129656;</span>
+      <h2 style="font-size: 1.5rem; color: var(--text-main); margin-top: 0.3rem;">Join HEMONEXAS</h2>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">Register to become a blood donor or request blood for medical needs</p>
+    </div>
+
+    <div id="registerError" class="alert alert-danger" style="display: none;"></div>
+
+    <form id="registerForm">
+      <!-- Basic Details -->
+      <div class="form-group">
+        <label for="full_name">Full Name *</label>
+        <input type="text" id="full_name" name="full_name" class="form-control" placeholder="e.g. Rajesh Kumar" required>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="email">Email Address *</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="name@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password (min 6 chars) *</label>
+          <input type="password" id="password" name="password" class="form-control" placeholder="Create secure password" required minlength="6">
+        </div>
+      </div>
+
+      <!-- Role Selection -->
+      <div class="form-group">
+        <label for="role">Select Account Type *</label>
+        <select id="role" name="role" class="form-control" required onchange="toggleRoleFields()">
+          <option value="donor">Blood Donor (Save lives by donating)</option>
+          <option value="patient">Patient / Hospital Requester (Request blood)</option>
+        </select>
+        <small style="color: var(--text-muted); font-size: 0.8rem;">* Admin accounts cannot be self-registered.</small>
+      </div>
+
+      <!-- Donor Specific Fields -->
+      <div id="donorFields" style="background: #fffafa; border: 1px dashed #feb2b2; padding: 1.2rem; border-radius: 8px; margin-bottom: 1.2rem;">
+        <h4 style="font-size: 0.95rem; color: var(--primary-dark); margin-bottom: 0.8rem;">Donor Profile & Availability</h4>
+        
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="blood_group">Blood Group *</label>
+            <select id="blood_group" name="blood_group" class="form-control">
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+" selected>O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone Number *</label>
+            <input type="tel" id="phone" name="phone" class="form-control" placeholder="+91 98300 00000">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="location">Residential Area / City *</label>
+          <input type="text" id="location" name="location" class="form-control" placeholder="e.g. Salt Lake, Kolkata">
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="availability">Availability Schedule *</label>
+            <select id="availability" name="availability" class="form-control">
+              <option value="24_HOURS" selected>24 Hours (Always Available)</option>
+              <option value="DAYTIME">Daytime (08:00 - 18:00)</option>
+              <option value="NIGHTTIME">Nighttime (18:00 - 08:00)</option>
+              <option value="8_HOURS">8-Hour Shift (09:00 - 17:00)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="maximum_travel_distance">Max Travel Distance (km) *</label>
+            <input type="number" id="maximum_travel_distance" name="maximum_travel_distance" class="form-control" value="15" min="1" max="200" step="0.5">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="latitude">Latitude (optional)</label>
+            <input type="number" id="latitude" name="latitude" class="form-control" placeholder="22.5805" step="0.0001">
+          </div>
+          <div class="form-group">
+            <label for="longitude">Longitude (optional)</label>
+            <input type="number" id="longitude" name="longitude" class="form-control" placeholder="88.4344" step="0.0001">
+          </div>
+        </div>
+        <small style="color: var(--text-muted); font-size: 0.8rem;">
+          &#128205; GPS coordinates enable precision Haversine distance matching.
+        </small>
+      </div>
+
+      <!-- Patient Specific Fields -->
+      <div id="patientFields" style="display: none; background: #f0fdf4; border: 1px dashed #86efac; padding: 1.2rem; border-radius: 8px; margin-bottom: 1.2rem;">
+        <h4 style="font-size: 0.95rem; color: #166534; margin-bottom: 0.8rem;">Patient Contact Details</h4>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="p_phone">Contact Phone</label>
+            <input type="tel" id="p_phone" name="p_phone" class="form-control" placeholder="+91 98765 43210">
+          </div>
+          <div class="form-group">
+            <label for="p_location">Hospital / City Location</label>
+            <input type="text" id="p_location" name="p_location" class="form-control" placeholder="e.g. Apollo Hospital, Kolkata">
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" id="regSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 0.65rem;">
+        Create Account
+      </button>
+    </form>
+
+    <div style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+      Already registered? <a href="{{ url_for('web.login_page') }}" style="color: var(--primary); font-weight: 600; text-decoration: none;">Sign In</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script>
+  function toggleRoleFields() {
+    const role = document.getElementById('role').value;
+    const donorFields = document.getElementById('donorFields');
+    const patientFields = document.getElementById('patientFields');
+    if (role === 'donor') {
+      donorFields.style.display = 'block';
+      patientFields.style.display = 'none';
+    } else {
+      donorFields.style.display = 'none';
+      patientFields.style.display = 'block';
+    }
+  }
+  initRegisterForm();
+</script>
+{% endblock %}

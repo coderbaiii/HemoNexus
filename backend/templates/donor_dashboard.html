@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Donor Dashboard — HEMONEXAS{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.8rem; color: var(--text-main);">Donor Control Portal</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">Manage your availability, 6-month verification cycle, and incoming requests.</p>
+  </div>
+</div>
+
+<!-- 6-Month Verification Lifecycle Alert / Status Card -->
+<div class="card" id="verificationCard" style="border-left: 5px solid var(--primary);">
+  <div class="card-header">
+    <div style="display: flex; align-items: center; gap: 0.8rem;">
+      <h3 class="card-title">&#128337; Six-Month Verification Lifecycle</h3>
+      <span id="statusBadge" class="badge badge-active">Loading...</span>
+    </div>
+    <button id="verifyBtn" class="btn btn-success btn-sm">
+      &#10003; Confirm Profile Freshness
+    </button>
+  </div>
+  
+  <div id="statusAlertBox"></div>
+
+  <div class="grid-4" style="margin-top: 1rem;">
+    <div class="stat-box">
+      <div id="statStatus" class="stat-num" style="font-size: 1.3rem; text-transform: uppercase;">ACTIVE</div>
+      <div class="stat-label">Profile Status</div>
+    </div>
+    <div class="stat-box">
+      <div id="statLastVerified" class="stat-num" style="font-size: 1.1rem;">-</div>
+      <div class="stat-label">Last Verified Date</div>
+    </div>
+    <div class="stat-box">
+      <div id="statNextDue" class="stat-num" style="font-size: 1.1rem;">-</div>
+      <div class="stat-label">Next Verification Due</div>
+    </div>
+    <div class="stat-box">
+      <div id="statDaysRemaining" class="stat-num" style="font-size: 1.3rem;">-</div>
+      <div class="stat-label">Days Until Due</div>
+    </div>
+  </div>
+  <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.8rem;">
+    * In accordance with HEMONEXAS standards, every donor must confirm their contact and availability every 180 days. Inactive donors are excluded from emergency searches.
+  </p>
+</div>
+
+<div class="grid-2">
+  <!-- Incoming Blood Requests -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">&#128227; Incoming Donation Invitations</h3>
+      <button class="btn btn-outline btn-sm" onclick="loadDonorRequests()">Refresh</button>
+    </div>
+    
+    <div id="requestsLoading" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+      Loading incoming requests...
+    </div>
+    
+    <div id="requestsList" style="display: none;"></div>
+  </div>
+
+  <!-- Profile & Availability Settings -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">&#9881; Availability & Location Settings</h3>
+    </div>
+
+    <form id="profileForm">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="p_blood">Blood Group</label>
+          <select id="p_blood" name="blood_group" class="form-control">
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="p_phone">Contact Phone</label>
+          <input type="tel" id="p_phone" name="phone" class="form-control" placeholder="+91 98300 00000">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="p_loc">Residential Location / City</label>
+        <input type="text" id="p_loc" name="location" class="form-control" placeholder="Salt Lake Sector 5, Kolkata">
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="p_avail">Availability Pattern</label>
+          <select id="p_avail" name="availability" class="form-control">
+            <option value="24_HOURS">24 Hours (All Day)</option>
+            <option value="DAYTIME">Daytime (08:00 - 18:00)</option>
+            <option value="NIGHTTIME">Nighttime (18:00 - 08:00)</option>
+            <option value="8_HOURS">8-Hour Shift (09:00 - 17:00)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="p_max_dist">Max Travel Distance (km)</label>
+          <input type="number" id="p_max_dist" name="maximum_travel_distance" class="form-control" min="1" max="150" step="0.5">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="p_lat">Latitude</label>
+          <input type="number" id="p_lat" name="latitude" class="form-control" step="0.0001">
+        </div>
+        <div class="form-group">
+          <label for="p_lon">Longitude</label>
+          <input type="number" id="p_lon" name="longitude" class="form-control" step="0.0001">
+        </div>
+      </div>
+
+      <button type="submit" id="saveProfileBtn" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+        Save Profile Updates
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal for Request Response Note -->
+<div id="responseModal" class="modal-overlay">
+  <div class="modal-content">
+    <h3 id="modalTitle" style="margin-bottom: 0.8rem;">Respond to Blood Request</h3>
+    <p id="modalSub" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;"></p>
+    <div class="form-group">
+      <label for="modalMessage">Optional Message / Notes</label>
+      <textarea id="modalMessage" class="form-control" rows="3" placeholder="e.g. Can reach the hospital by 2:00 PM"></textarea>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 0.8rem; margin-top: 1rem;">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button id="modalActionBtn" class="btn btn-primary">Confirm</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/donor.js') }}"></script>
+<script>
+  initDonorDashboard();
+</script>
+{% endblock %}
