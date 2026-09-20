@@ -138,3 +138,16 @@ def test_logout_flow(donor_client):
     assert me_res.status_code == 200
     me_data = me_res.get_json()
     assert me_data["user"] is None
+
+def test_app_imports_and_security_helpers():
+    """Verify that app.py imports and exposes generate_password_hash and check_password_hash."""
+    import app
+    assert hasattr(app, "check_password_hash")
+    assert hasattr(app, "generate_password_hash")
+    assert callable(app.check_password_hash)
+    assert callable(app.generate_password_hash)
+    
+    # Test that check_password_hash works properly
+    h = app.generate_password_hash("TestPassword123")
+    assert app.check_password_hash(h, "TestPassword123") is True
+    assert app.check_password_hash(h, "WrongPassword") is False

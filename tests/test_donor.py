@@ -80,3 +80,46 @@ def test_sweep_does_not_delete_inactive_donors(app, db_conn):
         # Verify inactive donor seeded earlier is preserved
         rohan = query_db("SELECT * FROM donor_profiles WHERE profile_status = 'INACTIVE'", db=db_conn)
         assert len(rohan) >= 1
+
+def test_schema_migration_preserves_existing_users(test_db_path):
+    """Verify that if a database already contains users, schema init creates missing tables without deleting users."""
+    import sqlite3
+    from backend.init_db import init_database
+    
+    # 1. Create a raw SQLite DB with only users and sqlite_sequence
+    conn = sqlite3.connect(test_db_path)
+    conn.execute("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+    """)
+    conn.execute("""
+        INSERT INTO users (full_name, email, password_hash, role) 
+        VALUES ('Existing Legacy User', 'legacy@example.com', 'some_hash', 'donor');
+    """)
+    conn.commit()
+    conn.close()
+
+    # 2. Run init_database on this database
+    init_database(test_db_path, seed_demo=False)
+
+    # 3. Verify user is preserved
+    verify_conn = sqlite3.connect(test_db_path)
+    verify_conn.row_factory = sqlite3.Row
+    user = verify_conn.execute("SELECT * FROM users WHERE email = 'legacy@example.com'").fetchone()
+    assert user is not None
+    assert user["full_name"] == "Existing Legacy User"
+
+    # 4. Verify all new tables now exist
+    tables = [r[0] for r in verify_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+    assert "donor_profiles" in tables
+    assert "patient_profiles" in tables
+    assert "blood_requests" in tables
+    assert "donor_request_responses" in tables
+    verify_conn.close()

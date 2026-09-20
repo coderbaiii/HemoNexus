@@ -5,9 +5,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import os
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, session
+from werkzeug.security import generate_password_hash, check_password_hash
 from backend.config import Config
-from backend.database import close_db
+from backend.database import get_db, close_db, query_db, execute_db
 from backend.init_db import init_database
 from backend.routes.auth import auth_bp
 from backend.routes.donor import donor_bp
