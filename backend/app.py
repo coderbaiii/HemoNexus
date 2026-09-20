@@ -13,28 +13,36 @@ from backend.routes.auth import auth_bp
 from backend.routes.donor import donor_bp
 from backend.routes.patient import patient_bp
 from backend.routes.admin import admin_bp
-from backend.routes.web import web_bp
 
 def create_app(config_class=Config):
     """
-    Application factory for HEMONEXAS Flask platform.
+    Application factory for HEMONEXAS Backend REST API platform.
     """
-    app = Flask(
-        __name__,
-        template_folder=str(Path(__file__).resolve().parent / "templates"),
-        static_folder=str(Path(__file__).resolve().parent / "static")
-    )
+    app = Flask(__name__)
     app.config.from_object(config_class)
 
     # Teardown database connection
     app.teardown_appcontext(close_db)
 
-    # Register Blueprints
+    # Register API Blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(donor_bp)
     app.register_blueprint(patient_bp)
     app.register_blueprint(admin_bp)
-    app.register_blueprint(web_bp)
+
+    @app.route("/")
+    def index():
+        return jsonify({
+            "service": "HEMONEXAS Backend REST API",
+            "status": "online",
+            "version": "1.0.0",
+            "endpoints": {
+                "auth": ["/api/register", "/api/login", "/api/logout", "/api/me"],
+                "donor": ["/api/donor/profile", "/api/donor/profile/verify", "/api/donor/status", "/api/donor/requests"],
+                "patient": ["/api/patient/profile", "/api/patient/blood-requests", "/api/patient/blood-requests/<id>/matches", "/api/patient/blood-requests/<id>/send-request"],
+                "admin": ["/api/admin/stats", "/api/admin/users", "/api/admin/donors", "/api/admin/verify-check"]
+            }
+        }), 200
 
     # Ensure database schema is initialized if file doesn't exist
     if app.config.get("DATABASE_PATH") and app.config["DATABASE_PATH"] != ":memory:":
