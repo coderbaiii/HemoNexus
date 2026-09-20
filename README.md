@@ -3,7 +3,8 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.1%2B-red.svg)](https://flask.palletsprojects.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-3-lightgrey.svg)](https://www.sqlite.org/)
-[![Status](https://img.shields.io/badge/Status-Complete%20%26%20Tested-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-38%20passed%20(100%25)-success.svg)]()
+[![Status](https://img.shields.io/badge/Status-Complete%20%26%20Verified-brightgreen.svg)]()
 
 > **Project Team (Team Egnima):**  
 > Arunima Ghosh &bull; Debriddhi Ghosh &bull; Baivabi Chakraborty &bull; Udipta Dhara
