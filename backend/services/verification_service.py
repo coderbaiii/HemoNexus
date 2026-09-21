@@ -1,3 +1,9 @@
+"""
+HEMONEXAS — Six-Month Verification Lifecycle Service
+Member 4 Responsibility: Implementation of continuous 180-day freshness verification,
+grace period evaluation, status transitions (ACTIVE -> VERIFICATION_DUE -> INACTIVE),
+and verification audit logging.
+"""
 import datetime
 from backend.config import Config
 from backend.database import get_db, query_db, execute_db
@@ -7,14 +13,12 @@ def parse_iso_datetime(dt_str):
     if not dt_str:
         return None
     try:
-        # Replace 'Z' with '+00:00' if present for standard parsing
         cleaned = dt_str.replace("Z", "+00:00")
         dt = datetime.datetime.fromisoformat(cleaned)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=datetime.timezone.utc)
         return dt
     except Exception:
-        # Fallback to current time if unparseable
         return datetime.datetime.now(datetime.timezone.utc)
 
 def compute_lifecycle_status(next_verification_dt, current_dt=None, interval_days=None, grace_days=None):
@@ -34,11 +38,14 @@ def compute_lifecycle_status(next_verification_dt, current_dt=None, interval_day
     else:
         return "INACTIVE"
 
-def refresh_donor_verification(user_id, interval_days=None, db=None):
+def refresh_donor_verification(user_id, phone_confirmed=1, address_confirmed=1,
+                               availability_confirmed=1, travel_distance_confirmed=1,
+                               interval_days=None, db=None):
     """
     Called when a donor confirms their profile or administrator verifies them.
     Refreshes last_verified_date to NOW, next_verification_date to NOW + interval_days,
     and resets status to ACTIVE.
+    Logs checkpoint in donor_verifications and audit_logs.
     """
     conn = db or get_db()
     days = interval_days or Config.VERIFICATION_INTERVAL_DAYS
@@ -49,19 +56,30 @@ def refresh_donor_verification(user_id, interval_days=None, db=None):
     next_due_iso = next_due.isoformat()
     
     execute_db(
-        """UPDATE donor_profiles 
+        """UPDATE donors 
            SET last_verified_date = ?, 
                next_verification_date = ?, 
-               profile_status = 'ACTIVE', 
+               status = 'ACTIVE', 
                updated_at = ?
            WHERE user_id = ?""",
         (now_iso, next_due_iso, now_iso, user_id),
         db=conn
     )
     
+    donor_row = query_db("SELECT id FROM donors WHERE user_id = ?", (user_id,), one=True, db=conn)
+    if donor_row:
+        execute_db(
+            """INSERT INTO donor_verifications 
+               (donor_id, verification_date, phone_confirmed, address_confirmed, availability_confirmed, travel_distance_confirmed, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)""",
+            (donor_row["id"], now_iso, 1 if phone_confirmed else 0, 1 if address_confirmed else 0,
+             1 if availability_confirmed else 0, 1 if travel_distance_confirmed else 0, now_iso),
+            db=conn
+        )
+    
     execute_db(
         "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
-        (user_id, "DONOR_VERIFIED", f"Profile verified; next due date: {next_due_iso}"),
+        (user_id, "DONOR_VERIFIED", f"Profile verified; status ACTIVE; next due date: {next_due_iso}"),
         db=conn
     )
     
@@ -80,7 +98,7 @@ def sweep_and_update_donor_statuses(db=None):
     Returns summary statistics of the sweep.
     """
     conn = db or get_db()
-    donors = query_db("SELECT id, user_id, profile_status, last_verified_date, next_verification_date FROM donor_profiles", db=conn)
+    donors = query_db("SELECT id, user_id, status, last_verified_date, next_verification_date FROM donors", db=conn)
     
     now = datetime.datetime.now(datetime.timezone.utc)
     now_iso = now.isoformat()
@@ -98,15 +116,16 @@ def sweep_and_update_donor_statuses(db=None):
         else:
             stats["inactive"] += 1
             
-        if calculated_status != donor["profile_status"]:
+        current_status = donor["status"]
+        if calculated_status != current_status:
             execute_db(
-                "UPDATE donor_profiles SET profile_status = ?, updated_at = ? WHERE id = ?",
+                "UPDATE donors SET status = ?, updated_at = ? WHERE id = ?",
                 (calculated_status, now_iso, donor["id"]),
                 db=conn
             )
             execute_db(
                 "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
-                (donor["user_id"], "STATUS_TRANSITION", f"Status changed from {donor['profile_status']} to {calculated_status}"),
+                (donor["user_id"], "STATUS_TRANSITION", f"Status changed from {current_status} to {calculated_status}"),
                 db=conn
             )
             stats["updated"] += 1
@@ -119,7 +138,7 @@ def get_donor_verification_details(user_id, db=None):
     """
     conn = db or get_db()
     donor = query_db(
-        "SELECT id, user_id, profile_status, last_verified_date, next_verification_date, updated_at FROM donor_profiles WHERE user_id = ?",
+        "SELECT id, user_id, status, last_verified_date, next_verification_date, updated_at FROM donors WHERE user_id = ?",
         (user_id,),
         one=True,
         db=conn
