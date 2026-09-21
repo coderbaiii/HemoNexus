@@ -1,50 +1,50 @@
 <!-- HemoNexus Sidebar Navigation -->
 <aside class="app-sidebar" id="appSidebar">
   <!-- Brand -->
-  <div class="sidebar-brand">
+  <a href="/dashboard" class="sidebar-brand text-decoration-none p-4 d-flex align-center gap-3 border-bottom">
     <div class="brand-icon-container" style="position: relative;">
-      <div class="brand-icon" style="background: var(--primary);">
+      <div class="brand-icon" style="background: var(--crimson);">
         <i class="fa-solid fa-droplet"></i>
       </div>
       <span class="brand-status-pulse" title="System Live & Connected"></span>
     </div>
     <div class="brand-text">
-      <div class="title" style="font-family: var(--font-heading);">Hemo<span style="color: var(--primary);">Nexus</span></div>
-      <div class="tagline">Smart Blood Network</div>
+      <div class="title fw-bold fs-5" style="font-family: var(--font-heading); color: var(--ink);">Hemo<span style="color: var(--crimson);">Nexus</span></div>
+      <div class="tagline" style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.05em; color: var(--ink-soft);">OPERATIONS COMMAND</div>
     </div>
-  </div>
+  </a>
 
   <!-- Menu Content -->
-  <div class="sidebar-content">
-    <div>
-      <div class="sidebar-section-title">Core Operations</div>
-      <ul class="sidebar-menu">
+  <div class="sidebar-content p-3 flex-1 overflow-y-auto">
+    <div class="mb-4">
+      <div class="sidebar-section-title text-xs fw-bold text-muted text-uppercase letter-spacing-1 mb-2 px-2">Core Operations</div>
+      <ul class="sidebar-menu list-unstyled m-0 d-flex flex-column gap-1">
         <li>
           <a href="/dashboard" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
             <i class="fa-solid fa-chart-pie"></i>
-            <span>Dashboard</span>
+            <span>Operations Dashboard</span>
           </a>
         </li>
         <li>
           <a href="/donors" class="sidebar-link {% if active_page == 'donors' %}active{% endif %}">
             <i class="fa-solid fa-users"></i>
-            <span>Donor Management</span>
-            <span class="sidebar-badge badge-primary">Active</span>
+            <span class="flex-1">Donor Management</span>
+            <span class="badge badge-primary">Active</span>
           </a>
         </li>
         <li>
           <a href="/requests" class="sidebar-link {% if active_page == 'requests' %}active{% endif %}">
             <i class="fa-solid fa-notes-medical"></i>
-            <span>Blood Requests</span>
-            <span class="sidebar-badge badge-danger">3 Urgent</span>
+            <span class="flex-1">Blood Requests</span>
+            <span class="badge badge-danger">3 Urgent</span>
           </a>
         </li>
       </ul>
     </div>
 
-    <div>
-      <div class="sidebar-section-title">Smart Matching & Emergency</div>
-      <ul class="sidebar-menu">
+    <div class="mb-4">
+      <div class="sidebar-section-title text-xs fw-bold text-muted text-uppercase letter-spacing-1 mb-2 px-2">Smart Matching & Emergency</div>
+      <ul class="sidebar-menu list-unstyled m-0 d-flex flex-column gap-1">
         <li>
           <a href="/match" class="sidebar-link {% if active_page == 'match' %}active{% endif %}">
             <i class="fa-solid fa-wand-magic-sparkles text-primary"></i>
@@ -53,8 +53,9 @@
         </li>
         <li>
           <a href="/emergency" class="sidebar-link emergency-link {% if active_page == 'emergency' %}active{% endif %}">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span>Code-Red Broadcast</span>
+            <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+            <span class="flex-1">Code-Red Emergency</span>
+            <span class="badge badge-danger animate-pulse-sos">SOS</span>
           </a>
         </li>
         <li>
@@ -66,13 +67,25 @@
       </ul>
     </div>
 
-    <div>
-      <div class="sidebar-section-title">Public Portal</div>
-      <ul class="sidebar-menu">
+    <div class="mb-4">
+      <div class="sidebar-section-title text-xs fw-bold text-muted text-uppercase letter-spacing-1 mb-2 px-2">Public Portal & Seeker</div>
+      <ul class="sidebar-menu list-unstyled m-0 d-flex flex-column gap-1">
         <li>
-          <a href="/" class="sidebar-link {% if active_page == 'landing' %}active{% endif %}">
-            <i class="fa-solid fa-house"></i>
+          <a href="/home" class="sidebar-link {% if active_page == 'home' or active_page == 'landing' %}active{% endif %}">
+            <i class="fa-solid fa-house-medical"></i>
             <span>Landing & Seeker Portal</span>
+          </a>
+        </li>
+        <li>
+          <a href="/home#compatibility" class="sidebar-link">
+            <i class="fa-solid fa-microscope"></i>
+            <span>Compatibility Visualizer</span>
+          </a>
+        </li>
+        <li>
+          <a href="/login" class="sidebar-link">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>Authentication / Login</span>
           </a>
         </li>
       </ul>
@@ -80,12 +93,12 @@
   </div>
 
   <!-- Sidebar Footer Status -->
-  <div class="sidebar-footer">
+  <div class="sidebar-footer p-3 border-top bg-light">
     <div class="d-flex align-center justify-between">
       <div class="d-flex align-center gap-2">
-        <span class="status-chip available">System Online</span>
+        <span class="badge badge-teal"><i class="fa-solid fa-circle-dot"></i> Live System</span>
       </div>
-      <span class="text-xs text-muted">v2.4.0</span>
+      <span class="text-xs text-muted text-mono">v2.4.0</span>
     </div>
   </div>
 </aside>

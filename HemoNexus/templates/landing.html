@@ -10,7 +10,7 @@
     <nav class="landing-nav">
       <a href="/home" class="brand-wrapper" aria-label="HemoNexus Home">
         <div class="brand-icon-container">
-          <div class="brand-icon">
+          <div class="brand-icon" style="background: var(--crimson);">
             <i class="fa-solid fa-droplet"></i>
           </div>
           <!-- Live Status Pulse Dot -->
@@ -18,59 +18,60 @@
         </div>
         <div class="brand-text">
           <div class="title" style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 800;">Hemo<span style="color: var(--crimson);">Nexus</span></div>
-          <div class="tagline" style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em;">SMART BLOOD NETWORK</div>
+          <div class="tagline" style="font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; color: var(--ink-soft);">SMART BLOOD NETWORK</div>
         </div>
       </a>
 
       <ul class="landing-nav-links">
-        <li><a href="#quick-search">Emergency Search</a></li>
-        <li><a href="#compatibility">Compatibility Engine</a></li>
-        <li><a href="#statistics">Network Impact</a></li>
-        <li><a href="#eligibility">Donor Eligibility</a></li>
+        <li><a href="#quick-search"><i class="fa-solid fa-magnifying-glass me-1"></i> Find Blood</a></li>
+        <li><a href="#compatibility"><i class="fa-solid fa-microscope me-1"></i> Compatibility Engine</a></li>
+        <li><a href="#statistics"><i class="fa-solid fa-chart-simple me-1"></i> Network Stats</a></li>
+        <li><a href="#eligibility"><i class="fa-solid fa-clipboard-check me-1"></i> Donor Quiz</a></li>
+        <li><a href="/donors"><i class="fa-solid fa-users me-1"></i> Donor Directory</a></li>
       </ul>
 
-      <div class="d-flex align-center gap-3">
-        <a href="/login" class="btn btn-outline btn-sm">
-          <i class="fa-solid fa-user-lock"></i> Portal Login
+      <div class="d-flex align-center gap-2">
+        <a href="/dashboard" class="btn btn-outline btn-sm">
+          <i class="fa-solid fa-chart-pie me-1"></i> Operations Dashboard
         </a>
         <a href="/emergency" class="btn btn-emergency btn-sm animate-pulse-sos">
-          <i class="fa-solid fa-truck-medical"></i> Code-Red SOS
+          <i class="fa-solid fa-truck-medical me-1"></i> Code-Red SOS
         </a>
       </div>
     </nav>
   </div>
 </header>
 
-<!-- Hero Section (Requirement 2: Staggered Entrance Animations on Page Load) -->
+<!-- Hero Section (Staggered Entrance Animations on Page Load) -->
 <section class="hero-section">
   <div class="container">
     <div class="row align-items-center g-5">
       
       <!-- Left Column: Messaging & CTAs -->
       <div class="col-lg-6">
-        <!-- Eyebrow / Tag (Stagger 1: 0ms delay, IBM Plex Mono, letter-spaced, crimson) -->
+        <!-- Eyebrow / Tag (Stagger 1) -->
         <div class="hero-badge text-mono stagger-entrance-1">
           <span class="status-dot animate-status-dot me-1"></span>
-          <span>Requirement-Based Clinical Blood Allocation</span>
+          <span>Requirement-Based Clinical Blood Allocation & Rapid Dispatch</span>
         </div>
 
-        <!-- Headline (Stagger 2: ~130ms delay) -->
+        <!-- Headline (Stagger 2) -->
         <h1 class="hero-title stagger-entrance-2">
           Connecting <span class="crimson-accent">Life-Saving</span> Blood Donors in Minutes.
         </h1>
 
-        <!-- Subtext (Stagger 3: ~260ms delay) -->
+        <!-- Subtext (Stagger 3) -->
         <p class="hero-subtitle stagger-entrance-3">
           HemoNexus automates real-time patient-to-donor matching using clinical ABO/Rh compatibility rules, geographic proximity heuristics, and instant multi-channel emergency dispatches.
         </p>
 
-        <!-- CTAs (Stagger 4: ~390ms delay) -->
+        <!-- CTAs (Stagger 4) -->
         <div class="d-flex align-center gap-3 flex-wrap stagger-entrance-4">
           <a href="/match" class="btn btn-primary btn-lg">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Requirement Matcher
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Requirement Matcher
           </a>
           <a href="/dashboard" class="btn btn-secondary btn-lg">
-            <i class="fa-solid fa-chart-pie"></i> Operations Dashboard
+            <i class="fa-solid fa-chart-pie me-1"></i> Operations Dashboard
           </a>
         </div>
 
@@ -80,7 +81,7 @@
           <span><i class="fa-solid fa-bolt text-primary"></i> Sub-10 Min SLA</span>
         </div>
 
-        <!-- Requirement 6: Impact Stat Block near Emergency Section -->
+        <!-- Impact Stat Block -->
         <div class="impact-stat-block mt-4 p-3 rounded-lg border bg-white shadow-sm stagger-entrance-4">
           <div class="d-flex align-center gap-3">
             <div class="impact-avatars-row d-flex align-center gap-1">
@@ -222,19 +223,19 @@
   </div>
 </section>
 
-<!-- Requirement 4: Interactive Blood Compatibility Visualizer Section -->
+<!-- Interactive Blood Compatibility Visualizer Section -->
 <section class="visualizer-section" id="compatibility">
   <div class="container">
     <div class="visualizer-header">
       <span class="badge badge-teal mb-2">
-        <i class="fa-solid fa-microscope"></i> Clinical Transfusion Engine
+        <i class="fa-solid fa-microscope me-1"></i> Clinical Transfusion Engine
       </span>
       <h2>Interactive Blood Compatibility Visualizer</h2>
       <p class="text-sm text-muted">
         Select a blood group chip below to inspect red blood cell donor and recipient compatibility rules in real-time.
       </p>
       
-      <!-- One-line explanation sentence container (Requirement 4) -->
+      <!-- One-line explanation sentence container -->
       <div class="p-2 px-3 rounded-pill bg-light d-inline-block border mt-2">
         <span class="fw-semibold text-ink small" id="compatSelectionSummary">
           O- can donate red blood cells to all 8 blood groups (Universal Donor), but can only safely receive red blood cells from O-.
@@ -242,7 +243,7 @@
       </div>
     </div>
 
-    <!-- Blood Group Selector Buttons (Keyboard Accessible) -->
+    <!-- Blood Group Selector Buttons -->
     <div class="compat-selector-wrapper">
       <div class="d-flex align-center justify-between mb-3">
         <span class="small fw-bold text-muted text-uppercase letter-spacing-1">
@@ -478,7 +479,9 @@
       </div>
       <p class="small text-muted mb-0">© 2026 HemoNexus Systems. Designed for clinical reliability and human life-saving.</p>
       <div class="d-flex gap-4">
-        <a href="/dashboard" class="small text-muted text-decoration-none">Staff Dashboard</a>
+        <a href="/dashboard" class="small text-light text-decoration-none">Operations Dashboard</a>
+        <a href="/donors" class="small text-light text-decoration-none">Donor Directory</a>
+        <a href="/match" class="small text-light text-decoration-none">Smart Matcher</a>
         <a href="/emergency" class="small text-primary fw-semibold text-decoration-none">Code-Red SOS</a>
       </div>
     </div>
@@ -487,5 +490,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/network-bg.js') }}"></script>
+<script src="{{ url_for('static', filename='js/network-bg.js') }}?v=3.5"></script>
 {% endblock %}

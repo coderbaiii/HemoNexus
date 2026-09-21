@@ -98,23 +98,26 @@ const HemoAuth = (() => {
   const handleLoginSubmit = (event) => {
     const btn = document.getElementById('loginSubmitBtn');
     if (btn) {
-      // Heartbeat spinner state (Requirement 5)
-      btn.disabled = true;
       btn.innerHTML = `
         <span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>
         <span>Authenticating Security Credentials...</span>
       `;
+      setTimeout(() => {
+        btn.disabled = true;
+      }, 50);
     }
   };
 
   const handleRegSubmit = (event) => {
     const btn = document.getElementById('registerSubmitBtn');
     if (btn) {
-      btn.disabled = true;
       btn.innerHTML = `
         <span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>
         <span>Registering Verified Profile...</span>
       `;
+      setTimeout(() => {
+        btn.disabled = true;
+      }, 50);
     }
   };
 

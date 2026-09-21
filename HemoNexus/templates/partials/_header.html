@@ -1,34 +1,42 @@
 <!-- HemoNexus Top Navigation Bar -->
 <header class="app-header">
-  <div class="header-left">
-    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle Navigation">
+  <div class="header-left d-flex align-center gap-3">
+    <button class="sidebar-toggle-btn btn btn-icon btn-sm btn-outline d-md-none" id="sidebarToggleBtn" aria-label="Toggle Navigation">
       <i class="fa-solid fa-bars"></i>
     </button>
-    <div class="header-search">
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" placeholder="Search donors, requests, hospitals... (Ctrl+K)" id="globalSearchInput">
+    
+    <div class="header-search position-relative">
+      <div class="input-group">
+        <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search donors, requests, blood groups... (Ctrl+K)" id="globalSearchInput" onkeydown="if(event.key === 'Enter') { window.location.href = '/donors?q=' + encodeURIComponent(this.value); }">
+      </div>
     </div>
   </div>
 
-  <div class="header-right">
+  <div class="header-right d-flex align-center gap-3">
+    <!-- Quick Public Portal Jump -->
+    <a href="/home" class="btn btn-outline btn-sm d-none d-lg-inline-flex" title="Go to Public Portal">
+      <i class="fa-solid fa-house-medical me-1"></i> Public Portal
+    </a>
+
     <!-- Quick Emergency SOS Button -->
     <a href="/emergency" class="btn btn-emergency btn-sm animate-pulse-sos">
-      <i class="fa-solid fa-truck-medical"></i>
+      <i class="fa-solid fa-truck-medical me-1"></i>
       <span>Code-Red SOS</span>
     </a>
 
     <!-- Notifications Bell -->
-    <button class="notification-bell-btn" title="Live Alerts" onclick="HemoUI.showToast('Urgent Alert', 'Critical O- inventory low at Lilavati Hospital.', 'warning')">
+    <button class="notification-bell-btn btn btn-icon btn-outline position-relative" title="Live Alerts" onclick="HemoUI.showToast('Urgent Alert', 'Critical O- inventory low at Lilavati Hospital.', 'warning')">
       <i class="fa-regular fa-bell"></i>
-      <span class="bell-badge"></span>
+      <span class="bell-badge position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
     </button>
 
     <!-- User Profile Dropdown -->
-    <div class="header-user" onclick="HemoUI.showToast('HemoNexus Admin', 'Logged in as Dr. Aditi Rao (Blood Bank Coordinator)', 'info')">
-      <div class="user-avatar">AR</div>
-      <div class="user-info">
-        <span class="user-name">Dr. Aditi Rao</span>
-        <span class="user-role">Blood Bank Lead</span>
+    <div class="header-user d-flex align-center gap-2 p-1 rounded-lg border bg-white cursor-pointer" onclick="HemoUI.showToast('HemoNexus Staff', 'Signed in as Dr. Aditi Rao (Blood Bank Coordinator)', 'info')">
+      <div class="user-avatar" style="width: 2rem; height: 2rem; font-size: 0.75rem;">AR</div>
+      <div class="user-info d-none d-sm-block text-start">
+        <div class="user-name fw-bold text-xs text-ink lh-1">Dr. Aditi Rao</div>
+        <div class="user-role text-muted" style="font-size: 0.65rem;">Blood Bank Lead</div>
       </div>
     </div>
   </div>
