@@ -214,22 +214,25 @@ ACTIVITIES = [
 
 
 @app.route('/')
+@app.route('/index')
+@app.route('/index.html')
 def index():
     # Site opens directly to Login page as the first view
     return redirect(url_for('login'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@app.route('/login.html', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         role = request.form.get('userRole', 'donor')
-        # Redirect to operations dashboard or home after successful authentication
         return redirect(url_for('dashboard'))
     role = request.args.get('role', 'donor')
     return render_template('login.html', is_public_page=True, active_page='login', active_role=role)
 
 
 @app.route('/register', methods=['GET', 'POST'])
+@app.route('/register.html', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         return redirect(url_for('dashboard'))
@@ -238,13 +241,17 @@ def register():
 
 
 @app.route('/home')
+@app.route('/home.html')
 @app.route('/landing')
+@app.route('/landing.html')
+@app.route('/main')
 def home():
     # Main product homepage after login or via navigation
     return render_template('home.html', is_public_page=True, active_page='home')
 
 
 @app.route('/dashboard')
+@app.route('/dashboard.html')
 def dashboard():
     return render_template(
         'dashboard.html',
@@ -257,6 +264,8 @@ def dashboard():
 
 
 @app.route('/donors')
+@app.route('/donor')
+@app.route('/donors.html')
 def donors():
     return render_template(
         'donors.html',
@@ -278,6 +287,8 @@ def donor_profile(donor_id):
 
 
 @app.route('/requests')
+@app.route('/request')
+@app.route('/requests.html')
 def requests():
     return render_template(
         'requests.html',
@@ -297,6 +308,9 @@ def request_create():
 
 
 @app.route('/match')
+@app.route('/matching')
+@app.route('/search')
+@app.route('/match.html')
 def matching():
     pre_group = request.args.get('group', 'O-')
     pre_comp = request.args.get('component', 'Whole Blood')
@@ -310,6 +324,8 @@ def matching():
 
 
 @app.route('/emergency')
+@app.route('/sos')
+@app.route('/emergency.html')
 def emergency():
     return render_template(
         'emergency.html',
@@ -319,6 +335,7 @@ def emergency():
 
 
 @app.route('/availability')
+@app.route('/availability.html')
 def availability():
     return render_template(
         'availability.html',
@@ -327,5 +344,11 @@ def availability():
     )
 
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return redirect(url_for('home'))
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
