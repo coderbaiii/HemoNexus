@@ -170,9 +170,65 @@
           </button>
         </form>
       </div>
+<!-- 4. Search Compatible Donors Matching Stepper Modal (Requirement 5) -->
+<div class="modal-backdrop matching-stepper-modal" id="searchMatchingModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <div class="d-flex align-center gap-2">
+        <span class="status-dot animate-pulse-teal"></span>
+        <h3 class="modal-title fs-5">Clinical Matching Engine</h3>
+      </div>
+      <button class="modal-close" data-modal-close aria-label="Close modal">&times;</button>
+    </div>
+    <div class="modal-body p-4">
+      <!-- Mini ECG Telemetry Wave Header -->
+      <div class="text-center mb-3">
+        <div class="d-flex align-center justify-center gap-2 text-mono text-xs text-muted mb-2">
+          <i class="fa-solid fa-wave-square text-primary"></i>
+          <span>CROSS-MATCH TELEMETRY IN PROGRESS</span>
+        </div>
+        <div class="p-2 rounded-lg bg-light border" style="height: 48px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+          <svg viewBox="0 0 400 36" style="width: 100%; height: 32px; stroke: var(--crimson); fill: none; stroke-width: 2; stroke-linecap: round;">
+            <path class="ecg-pulse-line" d="M0,18 L70,18 L80,6 L90,30 L100,2 L110,34 L120,18 L140,18 L210,18 L220,6 L230,30 L240,2 L250,34 L260,18 L280,18 L350,18 L360,6 L370,30 L380,2 L390,34 L400,18" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- 6 Sequential Matching Steps -->
+      <div class="matching-steps-container" id="matchingStepsList">
+        <div class="matching-step-item" id="step-1">
+          <span class="step-indicator"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+          <span class="step-text">Searching nearby donors...</span>
+        </div>
+        <div class="matching-step-item" id="step-2">
+          <span class="step-indicator"><i class="fa-solid fa-circle"></i></span>
+          <span class="step-text">Checking blood compatibility...</span>
+        </div>
+        <div class="matching-step-item" id="step-3">
+          <span class="step-indicator"><i class="fa-solid fa-circle"></i></span>
+          <span class="step-text">Checking donor availability...</span>
+        </div>
+        <div class="matching-step-item" id="step-4">
+          <span class="step-indicator"><i class="fa-solid fa-circle"></i></span>
+          <span class="step-text">Calculating distance...</span>
+        </div>
+        <div class="matching-step-item" id="step-5">
+          <span class="step-indicator"><i class="fa-solid fa-circle"></i></span>
+          <span class="step-text">Matching donors...</span>
+        </div>
+        <div class="matching-step-item" id="step-6">
+          <span class="step-indicator"><i class="fa-solid fa-circle"></i></span>
+          <span class="step-text">Compatible donors found</span>
+        </div>
+      </div>
+
+      <div class="text-center text-xs text-muted mt-3">
+        <i class="fa-solid fa-shield-halved text-teal me-1"></i> ABO/Rh Antigen Validation & Proximity Heuristics Active
+      </div>
     </div>
   </div>
 </div>
+
 
 <script>
 function handleAddDonorSubmit() {

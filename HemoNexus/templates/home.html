@@ -111,7 +111,7 @@
             </span>
           </div>
 
-          <form onsubmit="event.preventDefault(); window.location.href='/match?group=' + document.getElementById('heroBloodGroupInput').value + '&component=' + encodeURIComponent(document.getElementById('heroComponentSelect').value);">
+          <form onsubmit="event.preventDefault(); HemoUI.triggerMatchingSearchAnimation(document.getElementById('heroBloodGroupInput').value, document.getElementById('heroComponentSelect').value);">
             <div class="form-group mb-3">
               <label class="form-label small fw-semibold" id="patientBloodGroupLabel">Patient Blood Group *</label>
               <div class="hero-blood-tiles-grid" role="radiogroup" aria-labelledby="patientBloodGroupLabel">
@@ -172,35 +172,110 @@
   </div>
 </section>
 
-<!-- Signature ECG Heartbeat Divider -->
+<!-- Signature ECG Heartbeat Divider & Live Telemetry (Requirement 1) -->
 <div class="ecg-divider-container" aria-hidden="true">
   <div class="container">
     <div class="ecg-label-tag">
-      <span class="status-dot animate-status-dot"></span>
-      <span>LIVE NETWORK TELEMETRY • EMERGENCY RESPONSE READY</span>
+      <span class="status-dot available"></span>
+      <span>LIVE ECG TELEMETRY • EMERGENCY RESPONSE DISPATCH ACTIVE</span>
     </div>
-    <svg class="ecg-svg-track" viewBox="0 0 1200 46" preserveAspectRatio="none">
-      <path d="M0,23 L200,23 L220,23 L230,10 L240,36 L250,2 L260,40 L270,23 L290,23 L500,23 L520,23 L530,10 L540,36 L550,2 L560,40 L570,23 L590,23 L800,23 L820,23 L830,10 L840,36 L850,2 L860,40 L870,23 L890,23 L1200,23" />
-      <path class="ecg-pulse-line" d="M0,23 L200,23 L220,23 L230,10 L240,36 L250,2 L260,40 L270,23 L290,23 L500,23 L520,23 L530,10 L540,36 L550,2 L560,40 L570,23 L590,23 L800,23 L820,23 L830,10 L840,36 L850,2 L860,40 L870,23 L890,23 L1200,23" />
-    </svg>
+    <div class="ecg-wrapper">
+      <svg class="ecg-svg-track" viewBox="0 0 1200 48" preserveAspectRatio="none">
+        <path class="ecg-base-line" d="M0,24 L180,24 L200,24 L210,12 L220,38 L230,4 L240,42 L250,24 L270,24 L480,24 L500,24 L510,12 L520,38 L530,4 L540,42 L550,24 L570,24 L780,24 L800,24 L810,12 L820,38 L830,4 L840,42 L850,24 L870,24 L1080,24 L1100,24 L1110,12 L1120,38 L1130,4 L1140,42 L1150,24 L1200,24" />
+        <path class="ecg-pulse-line" d="M0,24 L180,24 L200,24 L210,12 L220,38 L230,4 L240,42 L250,24 L270,24 L480,24 L500,24 L510,12 L520,38 L530,4 L540,42 L550,24 L570,24 L780,24 L800,24 L810,12 L820,38 L830,4 L840,42 L850,24 L870,24 L1080,24 L1100,24 L1110,12 L1120,38 L1130,4 L1140,42 L1150,24 L1200,24" />
+        <circle class="ecg-travel-dot" r="4" />
+      </svg>
+    </div>
   </div>
 </div>
 
-<!-- Animated Statistics Section -->
-<section class="stats-section" id="statistics">
+<!-- Live Donor Network Pipeline (Requirement 3: DONOR → MATCHING ENGINE → HOSPITAL) -->
+<section class="py-4 bg-white border-bottom reveal-on-scroll">
+  <div class="container">
+    <div class="live-network-card">
+      <div class="live-network-header">
+        <div class="d-flex align-center gap-2">
+          <span class="status-pulse-teal"></span>
+          <span class="text-mono fw-bold text-xs text-uppercase letter-spacing-1">Live Allocation Telemetry</span>
+        </div>
+        <div class="d-flex align-center gap-2">
+          <span class="badge badge-teal"><i class="fa-solid fa-bolt"></i> Real-Time Automated Cross-Match</span>
+          <span class="badge badge-slate text-mono">SLA &lt; 10m</span>
+        </div>
+      </div>
+      
+      <div class="network-pipeline-container">
+        <!-- Node 1: Volunteer Donor -->
+        <div class="pipeline-node node-donor">
+          <div class="node-icon-circle">
+            <i class="fa-solid fa-hand-holding-droplet"></i>
+            <span class="node-ripple-ring"></span>
+          </div>
+          <div class="node-meta">
+            <span class="node-title">Verified Donor</span>
+            <span class="node-desc" id="networkDonorText">Rahul S. (O- Universal)</span>
+          </div>
+        </div>
+
+        <!-- Connecting Beam 1 -->
+        <div class="pipeline-beam">
+          <div class="beam-line">
+            <div class="beam-packet"></div>
+          </div>
+          <div class="beam-label">Antigen Verification</div>
+        </div>
+
+        <!-- Node 2: Smart Matching Engine -->
+        <div class="pipeline-node node-engine">
+          <div class="node-icon-circle">
+            <i class="fa-solid fa-microchip"></i>
+            <span class="node-ripple-ring ring-crimson"></span>
+          </div>
+          <div class="node-meta">
+            <span class="node-title">Matching Engine</span>
+            <span class="node-desc" id="networkEngineText">ABO/Rh Validated (100% Match)</span>
+          </div>
+        </div>
+
+        <!-- Connecting Beam 2 -->
+        <div class="pipeline-beam">
+          <div class="beam-line">
+            <div class="beam-packet packet-2"></div>
+          </div>
+          <div class="beam-label">Dispatched Route</div>
+        </div>
+
+        <!-- Node 3: Hospital ICU -->
+        <div class="pipeline-node node-hospital">
+          <div class="node-icon-circle">
+            <i class="fa-solid fa-hospital"></i>
+            <span class="node-ripple-ring ring-hospital"></span>
+          </div>
+          <div class="node-meta">
+            <span class="node-title">Hospital ICU</span>
+            <span class="node-desc" id="networkHospitalText">Lilavati Trauma Bay #3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Animated Statistics Section (Requirement 6) -->
+<section class="stats-section reveal-on-scroll" id="statistics">
   <div class="container">
     <div class="stats-grid">
-      <div class="stat-metric-box">
+      <div class="stat-metric-box reveal-on-scroll reveal-delay-1">
         <div class="d-flex align-center justify-between mb-2">
           <span class="badge badge-slate text-mono"><i class="fa-solid fa-users me-1"></i> DONOR POOL</span>
-          <span class="badge badge-teal">Verified</span>
+          <span class="badge badge-teal"><i class="fa-solid fa-circle-check"></i> Verified</span>
         </div>
         <div class="stat-number-display text-mono" data-counter="14820" data-suffix="+" data-decimals="0">14,820+</div>
         <div class="stat-metric-label">Verified Active Donors</div>
         <p class="stat-metric-desc">Registered, screened volunteer donors active across regional hospital networks.</p>
       </div>
 
-      <div class="stat-metric-box" style="border-top: 3px solid var(--crimson);">
+      <div class="stat-metric-box reveal-on-scroll reveal-delay-2" style="border-top: 3px solid var(--crimson);">
         <div class="d-flex align-center justify-between mb-2">
           <span class="badge badge-primary text-mono"><i class="fa-solid fa-stopwatch me-1 text-primary"></i> SPEED SLA</span>
           <span class="badge badge-danger">Emergency</span>
@@ -210,7 +285,7 @@
         <p class="stat-metric-desc">Heuristic matching and automated SMS/WhatsApp alerts drastically reduce response times.</p>
       </div>
 
-      <div class="stat-metric-box" style="border-top: 3px solid var(--teal);">
+      <div class="stat-metric-box reveal-on-scroll reveal-delay-3" style="border-top: 3px solid var(--teal);">
         <div class="d-flex align-center justify-between mb-2">
           <span class="badge badge-teal text-mono"><i class="fa-solid fa-heart-circle-check me-1 text-teal"></i> OUTCOME</span>
           <span class="badge badge-teal">Life-Saving</span>
@@ -223,8 +298,8 @@
   </div>
 </section>
 
-<!-- Interactive Blood Compatibility Visualizer Section -->
-<section class="visualizer-section" id="compatibility">
+<!-- Interactive Blood Compatibility Visualizer Section (Requirement 4) -->
+<section class="visualizer-section reveal-on-scroll" id="compatibility">
   <div class="container">
     <div class="visualizer-header">
       <span class="badge badge-teal mb-2">
@@ -413,7 +488,7 @@
 </section>
 
 <!-- Donor Eligibility Quiz Widget -->
-<section class="py-5" id="eligibility" style="background-color: var(--bg-alt);">
+<section class="py-5 reveal-on-scroll" id="eligibility" style="background-color: var(--bg-alt);">
   <div class="container">
     <div class="card shadow-sm mx-auto" style="max-width: 820px;">
       <div class="card-header bg-white">

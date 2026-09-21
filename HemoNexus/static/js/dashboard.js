@@ -24,10 +24,34 @@ const initDashboardData = () => {
   const countCriticalEl = document.getElementById('statCriticalRequests');
   const countFulfilledEl = document.getElementById('statFulfilled');
 
-  if (countDonorsEl) countDonorsEl.textContent = availableDonors;
-  if (countRequestsEl) countRequestsEl.textContent = activeRequests;
-  if (countCriticalEl) countCriticalEl.textContent = criticalRequests;
-  if (countFulfilledEl) countFulfilledEl.textContent = fulfilledCount;
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const animateValue = (el, target) => {
+    if (!el) return;
+    if (prefersReduced) {
+      el.textContent = target;
+      return;
+    }
+    const duration = 750;
+    const startTime = performance.now();
+    const update = (now) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(target * easeOut);
+      el.textContent = current;
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      } else {
+        el.textContent = target;
+      }
+    };
+    requestAnimationFrame(update);
+  };
+
+  animateValue(countDonorsEl, availableDonors);
+  animateValue(countRequestsEl, activeRequests);
+  animateValue(countCriticalEl, criticalRequests);
+  animateValue(countFulfilledEl, fulfilledCount);
 };
 
 const initInventoryVisuals = () => {

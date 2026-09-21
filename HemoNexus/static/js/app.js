@@ -141,7 +141,144 @@ const HemoUI = (() => {
     initCompatibilityVisualizer();
     initAnimatedStats();
     initHeroBloodTiles();
+    initScrollReveals();
+    initLiveNetworkTelemetry();
   });
+
+  /**
+   * REQUIREMENT 10: Scroll-Triggered Staggered Animations
+   */
+  const initScrollReveals = () => {
+    const revealElements = document.querySelectorAll('.reveal-on-scroll');
+    if (!revealElements.length) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      revealElements.forEach(el => el.classList.add('is-revealed'));
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-revealed');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, {
+      threshold: 0.12,
+      rootMargin: '0px 0px -40px 0px'
+    });
+
+    revealElements.forEach(el => observer.observe(el));
+  };
+
+  /**
+   * REQUIREMENT 3: Live Donor Network Pipeline Telemetry
+   * Concept: DONOR → MATCHING ENGINE → HOSPITAL
+   */
+  const initLiveNetworkTelemetry = () => {
+    const donorText = document.getElementById('networkDonorText');
+    const engineText = document.getElementById('networkEngineText');
+    const hospitalText = document.getElementById('networkHospitalText');
+    if (!donorText || !engineText || !hospitalText) return;
+
+    const streamCases = [
+      { donor: 'Rahul S. (O- Universal)', engine: 'ABO/Rh Validated (100% Match)', hospital: 'Lilavati Trauma Bay #3' },
+      { donor: 'Priya M. (A+ Platelets)', engine: 'Proximity Heuristic (2.4 km, 96%)', hospital: 'Hinduja ICU Bed #12' },
+      { donor: 'Vikram N. (B+ Whole Blood)', engine: 'Emergency Cooldown Clear (94%)', hospital: 'Nanavati Emergency Intake' },
+      { donor: 'Ananya D. (AB- Rare Donor)', engine: 'Cross-Match Validated (99%)', hospital: 'Tata Memorial Oncology' }
+    ];
+
+    let currentCaseIdx = 0;
+    setInterval(() => {
+      currentCaseIdx = (currentCaseIdx + 1) % streamCases.length;
+      const c = streamCases[currentCaseIdx];
+
+      [donorText, engineText, hospitalText].forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-4px)';
+        el.style.transition = 'all 0.25s ease';
+      });
+
+      setTimeout(() => {
+        donorText.textContent = c.donor;
+        engineText.textContent = c.engine;
+        hospitalText.textContent = c.hospital;
+
+        [donorText, engineText, hospitalText].forEach(el => {
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+        });
+      }, 250);
+    }, 4500);
+  };
+
+  /**
+   * REQUIREMENT 5: Search Compatible Donors Animation
+   * Professional multi-step ECG and heuristic matching sequence
+   */
+  const triggerMatchingSearchAnimation = (bloodGroup = 'O-', component = 'Whole Blood', destinationUrl = null) => {
+    const modalId = 'searchMatchingModal';
+    openModal(modalId);
+
+    const steps = [
+      { id: 'step-1', text: 'Searching nearby donors...' },
+      { id: 'step-2', text: 'Checking blood compatibility...' },
+      { id: 'step-3', text: 'Checking donor availability...' },
+      { id: 'step-4', text: 'Calculating distance...' },
+      { id: 'step-5', text: 'Matching donors...' },
+      { id: 'step-6', text: 'Compatible donors found' }
+    ];
+
+    // Reset step UI
+    steps.forEach((s, idx) => {
+      const el = document.getElementById(s.id);
+      if (el) {
+        el.className = 'matching-step-item' + (idx === 0 ? ' is-active' : '');
+        const indicator = el.querySelector('.step-indicator');
+        if (indicator) {
+          indicator.innerHTML = idx === 0 ? '<i class="fa-solid fa-circle-notch fa-spin"></i>' : '<i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i>';
+        }
+      }
+    });
+
+    let currentStep = 0;
+    const stepDuration = 280;
+
+    const advanceStep = () => {
+      if (currentStep < steps.length) {
+        const prevEl = document.getElementById(steps[currentStep].id);
+        if (prevEl) {
+          prevEl.classList.remove('is-active');
+          prevEl.classList.add('is-completed');
+          const indicator = prevEl.querySelector('.step-indicator');
+          if (indicator) indicator.innerHTML = '<i class="fa-solid fa-check"></i>';
+        }
+
+        currentStep++;
+
+        if (currentStep < steps.length) {
+          const nextEl = document.getElementById(steps[currentStep].id);
+          if (nextEl) {
+            nextEl.classList.add('is-active');
+            const indicator = nextEl.querySelector('.step-indicator');
+            if (indicator) indicator.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+          }
+          setTimeout(advanceStep, stepDuration);
+        } else {
+          // All steps complete -> transition to match view
+          setTimeout(() => {
+            closeModal(modalId);
+            const target = destinationUrl || `/match?group=${encodeURIComponent(bloodGroup)}&component=${encodeURIComponent(component)}`;
+            window.location.href = target;
+          }, 350);
+        }
+      }
+    };
+
+    setTimeout(advanceStep, stepDuration);
+  };
 
   /**
    * Hero Blood Selection Tile Helper
@@ -407,7 +544,10 @@ const HemoUI = (() => {
 
     // Update active state and aria-pressed on selector buttons
     document.querySelectorAll('.compat-selector-btn').forEach(btn => {
-      const isSelected = btn.getAttribute('data-group') === selectedGroup;
+      const btnGroup = btn.getAttribute('data-group');
+      const isSelected = btnGroup === selectedGroup;
+      const isCompatibleRecipient = data.canDonateTo.includes(btnGroup);
+
       btn.classList.toggle('active', isSelected);
       btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
     });
@@ -472,7 +612,7 @@ const HemoUI = (() => {
   };
 
   /**
-   * REQUIREMENT 2: Animated Statistics with IntersectionObserver (~800ms)
+   * REQUIREMENT 6: Animated Statistics with IntersectionObserver (~800ms)
    */
   const initAnimatedStats = () => {
     const counterElements = document.querySelectorAll('[data-counter]');
@@ -497,7 +637,7 @@ const HemoUI = (() => {
           animateCounterElement(entry.target);
         }
       });
-    }, { threshold: 0.3 });
+    }, { threshold: 0.25 });
 
     counterElements.forEach(el => observer.observe(el));
   };
@@ -513,7 +653,7 @@ const HemoUI = (() => {
     const target = parseFloat(el.getAttribute('data-counter'));
     const suffix = el.getAttribute('data-suffix') || '';
     const decimals = parseInt(el.getAttribute('data-decimals') || '0', 10);
-    const duration = 800; // ~800ms
+    const duration = 850; // ~850ms
     const startTime = performance.now();
 
     const updateCount = (currentTime) => {
@@ -539,6 +679,7 @@ const HemoUI = (() => {
     openModal,
     closeModal,
     showToast,
-    selectBloodGroupVisualizer
+    selectBloodGroupVisualizer,
+    triggerMatchingSearchAnimation
   };
 })();

@@ -131,10 +131,17 @@ function runMatchAlgorithm() {
   if (filtered.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-triangle-exclamation text-danger"></i></div>
-        <div class="empty-state-title">No Donors Match Exact Criteria</div>
-        <p class="empty-state-desc">Try increasing the radius slider or broadcast an emergency SOS alert.</p>
-        <a href="/emergency" class="btn btn-emergency btn-sm">Launch Emergency Broadcast</a>
+        <div class="empty-state-icon"><i class="fa-solid fa-satellite-dish text-primary animate-pulse-sos"></i></div>
+        <div class="empty-state-title">No Compatible Donors Found Nearby</div>
+        <p class="empty-state-desc">No registered eligible donors match the specified proximity limit. Expand the radius or broadcast an emergency alert.</p>
+        <div class="d-flex align-center justify-center gap-2 flex-wrap">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('matchRadius').value = 30; document.getElementById('radiusVal').textContent = '30'; runMatchAlgorithm();">
+            <i class="fa-solid fa-arrows-up-down-left-right me-1"></i> Widen Search Radius (30 km)
+          </button>
+          <a href="/emergency" class="btn btn-emergency btn-sm">
+            <i class="fa-solid fa-radiation me-1"></i> Launch Emergency Broadcast
+          </a>
+        </div>
       </div>
     `;
     return;
