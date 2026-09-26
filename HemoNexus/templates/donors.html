@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Donor Management - HemoNexus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Blood Donor Directory</h1>
+    <p class="page-subtitle">Search, filter, verify, and contact active blood donors across the regional network.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary" data-modal-target="addDonorModal">
+      <i class="fa-solid fa-user-plus"></i> Register New Donor
+    </button>
+  </div>
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="card mb-6">
+  <div class="card-body p-4">
+    <div class="d-grid gap-4" style="grid-template-columns: 2fr 1fr 1fr;">
+      <div class="input-group">
+        <i class="fa-solid fa-magnifying-glass input-prefix-icon"></i>
+        <input type="text" class="form-control" id="donorSearchQuery" placeholder="Search by name, area, phone, or email..." oninput="filterDonors()">
+      </div>
+
+      <div>
+        <select class="form-select" id="donorBloodFilter" onchange="filterDonors()">
+          <option value="">All Blood Groups</option>
+          <option value="O-">O- (Universal Donor)</option>
+          <option value="O+">O+</option>
+          <option value="A-">A-</option>
+          <option value="A+">A+</option>
+          <option value="B-">B-</option>
+          <option value="B+">B+</option>
+          <option value="AB-">AB-</option>
+          <option value="AB+">AB+</option>
+        </select>
+      </div>
+
+      <div>
+        <select class="form-select" id="donorStatusFilter" onchange="filterDonors()">
+          <option value="">All Statuses</option>
+          <option value="available">Available</option>
+          <option value="cooldown">In Cooldown (<90d)</option>
+          <option value="in-transit">In Transit</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Donor Table / Card Container -->
+<div class="card">
+  <div class="card-header">
+    <div class="d-flex align-center gap-2">
+      <h3 class="card-title">Registered Donors</h3>
+      <span class="badge badge-slate" id="donorCountBadge">Showing All</span>
+    </div>
+    <div class="d-flex align-center gap-2">
+      <button class="btn btn-icon" title="List View" onclick="setDonorView('table')"><i class="fa-solid fa-list"></i></button>
+      <button class="btn btn-icon" title="Grid View" onclick="setDonorView('grid')"><i class="fa-solid fa-grip"></i></button>
+    </div>
+  </div>
+
+  <div class="table-container" id="donorTableView" style="border: none; border-radius: 0;">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Donor Profile</th>
+          <th>Blood Group</th>
+          <th>Location & Distance</th>
+          <th>Availability</th>
+          <th>Donations</th>
+          <th>Last Donated</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="donorTableBody">
+        <!-- Rendered by client JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <div id="donorGridView" class="card-body d-grid grid-3 gap-4 d-none">
+    <!-- Rendered in grid mode -->
+  </div>
+
+  <div id="donorEmptyState" class="empty-state d-none">
+    <div class="empty-state-icon">
+      <i class="fa-solid fa-user-slash"></i>
+    </div>
+    <div class="empty-state-title">No Donors Match Your Filter</div>
+    <p class="empty-state-desc">Try clearing the search query or adjusting blood group parameters.</p>
+    <button class="btn btn-outline btn-sm" onclick="clearDonorFilters()">Reset Filters</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentView = 'table';
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderDonorsList();
+});
+
+function renderDonorsList() {
+  const donors = HemoStore.getDonors();
+  const query = document.getElementById('donorSearchQuery')?.value.toLowerCase().trim() || '';
+  const blood = document.getElementById('donorBloodFilter')?.value || '';
+  const status = document.getElementById('donorStatusFilter')?.value || '';
+
+  const filtered = donors.filter(d => {
+    const matchesQuery = !query || d.name.toLowerCase().includes(query) || d.area.toLowerCase().includes(query) || d.phone.includes(query);
+    const matchesBlood = !blood || d.bloodGroup === blood;
+    const matchesStatus = !status || d.status === status;
+    return matchesQuery && matchesBlood && matchesStatus;
+  });
+
+  const countBadge = document.getElementById('donorCountBadge');
+  if (countBadge) countBadge.textContent = `${filtered.length} Donors Found`;
+
+  const tbody = document.getElementById('donorTableBody');
+  const grid = document.getElementById('donorGridView');
+  const empty = document.getElementById('donorEmptyState');
+
+  if (filtered.length === 0) {
+    if (tbody) tbody.innerHTML = '';
+    if (grid) grid.innerHTML = '';
+    if (empty) empty.classList.remove('d-none');
+    return;
+  } else {
+    if (empty) empty.classList.add('d-none');
+  }
+
+  // Table rows
+  if (tbody) {
+    tbody.innerHTML = filtered.map(d => {
+      let statusClass = 'available';
+      let statusLabel = 'Available';
+      if (d.status === 'cooldown') { statusClass = 'cooldown'; statusLabel = 'Cooldown'; }
+      if (d.status === 'in-transit') { statusClass = 'in-transit'; statusLabel = 'In-Transit'; }
+
+      return `
+        <tr>
+          <td>
+            <div class="d-flex align-center gap-3">
+              <div class="user-avatar">${d.name.split(' ').map(n=>n[0]).join('')}</div>
+              <div>
+                <div class="d-flex align-center gap-2">
+                  <a href="/donors/${d.id}" class="fw-bold text-slate-900">${d.name}</a>
+                  ${d.verified ? '<span class="verified-badge"><i class="fa-solid fa-circle-check"></i></span>' : ''}
+                </div>
+                <div class="text-xs text-muted">${d.gender}, ${d.age} yrs • ${d.phone}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="blood-badge blood-badge-sm">${d.bloodGroup}</span>
+          </td>
+          <td>
+            <div class="text-sm fw-medium text-slate-800">${d.area}</div>
+            <div class="text-xs text-muted"><i class="fa-solid fa-location-arrow text-primary"></i> ${d.distanceKm} km away</div>
+          </td>
+          <td>
+            <span class="status-chip ${statusClass}">${statusLabel}</span>
+          </td>
+          <td>
+            <div class="fw-bold text-slate-900">${d.totalDonations} times</div>
+            <div class="text-xs text-success"><i class="fa-solid fa-bolt"></i> ${d.responseRate}% response</div>
+          </td>
+          <td>
+            <div class="text-xs fw-medium text-slate-700">${d.lastDonatedDate}</div>
+          </td>
+          <td>
+            <div class="d-flex align-center gap-2">
+              <a href="/donors/${d.id}" class="btn btn-outline btn-sm" title="View Profile">
+                <i class="fa-solid fa-id-card"></i>
+              </a>
+              <button class="btn btn-primary btn-sm" onclick="openContactModal('${d.name}', '${d.bloodGroup}', '${d.phone}', '${d.area}')">
+                <i class="fa-solid fa-phone"></i> Contact
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Grid cards
+  if (grid) {
+    grid.innerHTML = filtered.map(d => `
+      <div class="card p-4">
+        <div class="d-flex align-center justify-between mb-3">
+          <span class="blood-badge">${d.bloodGroup}</span>
+          <span class="status-chip ${d.status}">${d.status}</span>
+        </div>
+        <h4 class="fw-bold text-slate-900 mb-1">
+          <a href="/donors/${d.id}">${d.name}</a>
+          ${d.verified ? '<i class="fa-solid fa-circle-check text-teal-600 text-xs"></i>' : ''}
+        </h4>
+        <p class="text-xs text-muted mb-3"><i class="fa-solid fa-location-dot text-primary"></i> ${d.area} • ${d.distanceKm} km</p>
+        <div class="d-flex align-center justify-between text-xs text-slate-700 pt-3 border-top mb-3">
+          <span>Donations: <strong>${d.totalDonations}</strong></span>
+          <span>Response: <strong class="text-success">${d.responseRate}%</strong></span>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="/donors/${d.id}" class="btn btn-outline btn-sm flex-1 justify-center">Profile</a>
+          <button class="btn btn-primary btn-sm flex-1 justify-center" onclick="openContactModal('${d.name}', '${d.bloodGroup}', '${d.phone}', '${d.area}')">Contact</button>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function filterDonors() {
+  renderDonorsList();
+}
+
+function clearDonorFilters() {
+  document.getElementById('donorSearchQuery').value = '';
+  document.getElementById('donorBloodFilter').value = '';
+  document.getElementById('donorStatusFilter').value = '';
+  renderDonorsList();
+}
+
+function setDonorView(view) {
+  currentView = view;
+  const table = document.getElementById('donorTableView');
+  const grid = document.getElementById('donorGridView');
+  if (view === 'table') {
+    table.classList.remove('d-none');
+    grid.classList.add('d-none');
+  } else {
+    table.classList.add('d-none');
+    grid.classList.remove('d-none');
+  }
+}
+</script>
+{% endblock %}

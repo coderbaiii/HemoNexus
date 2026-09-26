@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Smart Donor Matching Engine - HemoNexus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Requirement-Based Smart Donor Matching Engine</h1>
+    <p class="page-subtitle">Multi-factor heuristic ranking: antigen compatibility, geographic radius, donation cooldown recency, and response reliability.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/emergency" class="btn btn-emergency">
+      <i class="fa-solid fa-radiation"></i> Launch Emergency SOS
+    </a>
+  </div>
+</div>
+
+<!-- Matching Criteria Filter Matrix -->
+<div class="card mb-6">
+  <div class="card-header bg-slate-50">
+    <div class="d-flex align-center gap-2">
+      <i class="fa-solid fa-sliders text-primary text-xl"></i>
+      <div>
+        <h3 class="card-title">Patient Requirement Parameters</h3>
+        <p class="card-subtitle">Adjust criteria to dynamically rank compatible donors</p>
+      </div>
+    </div>
+  </div>
+  <div class="card-body p-6">
+    <div class="d-grid grid-4 gap-4">
+      <div class="form-group">
+        <label class="form-label">Patient Blood Group *</label>
+        <select class="form-select" id="matchRecipientGroup" onchange="runMatchAlgorithm()">
+          <option value="O-" {% if pre_group == 'O-' %}selected{% endif %}>O- (Universal Recipient from O- only)</option>
+          <option value="O+" {% if pre_group == 'O+' %}selected{% endif %}>O+ (Receives O-, O+)</option>
+          <option value="A-" {% if pre_group == 'A-' %}selected{% endif %}>A- (Receives A-, O-)</option>
+          <option value="A+" {% if pre_group == 'A+' %}selected{% endif %}>A+ (Receives A+, A-, O+, O-)</option>
+          <option value="B-" {% if pre_group == 'B-' %}selected{% endif %}>B- (Receives B-, O-)</option>
+          <option value="B+" {% if pre_group == 'B+' %}selected{% endif %}>B+ (Receives B+, B-, O+, O-)</option>
+          <option value="AB-" {% if pre_group == 'AB-' %}selected{% endif %}>AB- (Receives AB-, A-, B-, O-)</option>
+          <option value="AB+" {% if pre_group == 'AB+' %}selected{% endif %}>AB+ (Universal RBC Recipient)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Component Needed *</label>
+        <select class="form-select" id="matchComponent" onchange="runMatchAlgorithm()">
+          <option value="Whole Blood" {% if pre_comp == 'Whole Blood' %}selected{% endif %}>Whole Blood (Standard)</option>
+          <option value="Platelets" {% if pre_comp == 'Platelets' %}selected{% endif %}>Single Donor Platelets (SDP)</option>
+          <option value="Plasma" {% if pre_comp == 'Plasma' %}selected{% endif %}>Fresh Frozen Plasma (FFP)</option>
+          <option value="RBC" {% if pre_comp == 'RBC' %}selected{% endif %}>Packed Red Blood Cells (PRBC)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Max Proximity Distance (<span id="radiusVal">15</span> km)</label>
+        <input type="range" class="form-control" id="matchRadius" min="2" max="30" value="15" oninput="document.getElementById('radiusVal').textContent = this.value; runMatchAlgorithm();" style="padding: 0.25rem;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Donor Verification</label>
+        <label class="switch-label mt-2">
+          <input type="checkbox" class="switch-input" id="matchVerifiedOnly" checked onchange="runMatchAlgorithm()">
+          <span class="switch-slider"></span>
+          <span class="text-xs fw-semibold text-slate-700">Verified Donors Only</span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Matching Results Container -->
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="d-flex align-center gap-2">
+        <h3 class="card-title">Ranked Compatible Candidates</h3>
+        <span class="badge badge-success" id="matchFoundBadge">Computing...</span>
+      </div>
+      <p class="card-subtitle">Sorted by composite algorithm score (Antigen 40%, Distance 30%, Cooldown 20%, Response 10%)</p>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" onclick="runMatchAlgorithm()">
+      <i class="fa-solid fa-rotate-right"></i> Recalculate
+    </button>
+  </div>
+
+  <div class="card-body p-6" id="matchResultsContainer">
+    <!-- Populated by matching engine -->
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Read URL params if any
+  const urlParams = new URLSearchParams(window.location.search);
+  const group = urlParams.get('group');
+  const comp = urlParams.get('component');
+
+  if (group && document.getElementById('matchRecipientGroup')) {
+    document.getElementById('matchRecipientGroup').value = group;
+  }
+  if (comp && document.getElementById('matchComponent')) {
+    document.getElementById('matchComponent').value = comp;
+  }
+
+  runMatchAlgorithm();
+});
+
+function runMatchAlgorithm() {
+  const recipientGroup = document.getElementById('matchRecipientGroup').value;
+  const component = document.getElementById('matchComponent').value;
+  const maxDistanceKm = parseInt(document.getElementById('matchRadius').value);
+  const verifiedOnly = document.getElementById('matchVerifiedOnly').checked;
+
+  const results = HemoMatcher.findMatches({
+    recipientGroup,
+    component,
+    maxDistanceKm
+  });
+
+  const filtered = verifiedOnly ? results.filter(r => r.donor.verified) : results;
+
+  const badge = document.getElementById('matchFoundBadge');
+  if (badge) badge.textContent = `${filtered.length} Optimal Matches Found`;
+
+  const container = document.getElementById('matchResultsContainer');
+  if (!container) return;
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-satellite-dish text-primary animate-pulse-sos"></i></div>
+        <div class="empty-state-title">No Compatible Donors Found Nearby</div>
+        <p class="empty-state-desc">No registered eligible donors match the specified proximity limit. Expand the radius or broadcast an emergency alert.</p>
+        <div class="d-flex align-center justify-center gap-2 flex-wrap">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('matchRadius').value = 30; document.getElementById('radiusVal').textContent = '30'; runMatchAlgorithm();">
+            <i class="fa-solid fa-arrows-up-down-left-right me-1"></i> Widen Search Radius (30 km)
+          </button>
+          <a href="/emergency" class="btn btn-emergency btn-sm">
+            <i class="fa-solid fa-radiation me-1"></i> Launch Emergency Broadcast
+          </a>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(item => {
+    let scoreBadgeClass = 'match-score-high';
+    if (item.matchScore < 80) scoreBadgeClass = 'match-score-medium';
+    if (item.matchScore < 60) scoreBadgeClass = 'match-score-low';
+
+    return `
+      <div class="match-candidate-card animate-fade-in">
+        <div class="d-flex align-center gap-4 flex-1">
+          <div class="match-score-badge ${scoreBadgeClass}">
+            <div class="text-xl fw-extrabold">${item.matchScore}%</div>
+            <div class="text-xs" style="font-size: 0.65rem; text-transform: uppercase;">Match</div>
+          </div>
+
+          <div class="flex-1">
+            <div class="d-flex align-center gap-2 mb-1 flex-wrap">
+              <span class="blood-badge blood-badge-sm">${item.donor.bloodGroup}</span>
+              <a href="/donors/${item.donor.id}" class="text-base fw-bold text-slate-900">${item.donor.name}</a>
+              ${item.donor.verified ? '<span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Verified</span>' : ''}
+              <span class="status-chip ${item.donor.status}">${item.donor.status}</span>
+            </div>
+
+            <div class="text-xs text-muted mb-2">
+              <i class="fa-solid fa-location-dot text-primary"></i> ${item.donor.area} • ${item.donor.distanceKm} km away • ${item.donor.phone}
+            </div>
+
+            <div class="match-reasons-list">
+              ${item.reasons.map(r => `<span class="reason-chip"><i class="fa-solid fa-check text-success"></i> ${r}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-column gap-2" style="min-width: 140px;">
+          <button class="btn btn-primary btn-sm justify-center" onclick="dispatchDirectMatch('${item.donor.name}', '${item.donor.bloodGroup}')">
+            <i class="fa-solid fa-paper-plane"></i> Dispatch
+          </button>
+          <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${item.donor.name}', '${item.donor.bloodGroup}', '${item.donor.phone}', '${item.donor.area}')">
+            <i class="fa-solid fa-phone"></i> Contact
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function dispatchDirectMatch(donorName, bloodGroup) {
+  HemoUI.showToast(
+    'Donor Dispatched',
+    `Dispatch request sent to ${donorName} (${bloodGroup}). Hospital triage informed.`,
+    'success'
+  );
+}
+</script>
+{% endblock %}

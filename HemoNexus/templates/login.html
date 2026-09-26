@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}HemoNexus - Secure Portal Access | Donor & Patient Login{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+
+{% block public_content %}
+<div class="auth-page-wrapper d-flex align-center justify-center min-vh-100 py-5">
+  <div class="container" style="max-width: 520px; position: relative; z-index: 2;">
+    
+    <!-- Brand / Eyebrow (Requirement 2: Stagger 1) -->
+    <div class="text-center mb-4 stagger-entrance-1">
+      <a href="/home" class="brand-wrapper d-inline-flex align-center justify-center gap-2 mb-2" aria-label="HemoNexus Home">
+        <div class="brand-icon-container">
+          <div class="brand-icon">
+            <i class="fa-solid fa-droplet"></i>
+          </div>
+          <span class="brand-status-pulse" title="System Connected"></span>
+        </div>
+        <span class="fs-4 fw-bold" style="font-family: var(--font-heading); color: var(--ink);">Hemo<span style="color: var(--crimson);">Nexus</span></span>
+      </a>
+      <div>
+        <span class="badge badge-primary">
+          <i class="fa-solid fa-shield-heart"></i> Clinical Authentication Gateway
+        </span>
+      </div>
+    </div>
+
+    <!-- Login Card Container -->
+    <div class="card auth-card shadow-lg border-0">
+      
+      <!-- Heading & Role Title (Requirement 2: Stagger 2) -->
+      <div class="card-header bg-white border-0 pt-4 pb-2 px-4 text-center stagger-entrance-2">
+        <h1 class="h3 fw-bold mb-1" id="loginHeaderTitle">Welcome Back</h1>
+        <p class="text-muted small mb-3" id="loginHeaderSubtitle">Sign in to access your verified HemoNexus donor profile</p>
+
+        <!-- Role Toggle Pills (Requirement 1: Pill-shaped toggle switch) -->
+        <div class="role-pill-toggle-container mx-auto" role="tablist" aria-label="User Type Selector">
+          <button type="button" 
+                  class="role-pill-btn {% if active_role != 'patient' %}active{% endif %}" 
+                  id="toggleDonorBtn" 
+                  role="tab" 
+                  aria-selected="{% if active_role != 'patient' %}true{% else %}false{% endif %}"
+                  aria-controls="donorPane"
+                  onclick="HemoAuth.switchRole('donor')">
+            <i class="fa-solid fa-heart-pulse me-1"></i> Donor Login
+          </button>
+          <button type="button" 
+                  class="role-pill-btn {% if active_role == 'patient' %}active{% endif %}" 
+                  id="togglePatientBtn" 
+                  role="tab" 
+                  aria-selected="{% if active_role == 'patient' %}true{% else %}false{% endif %}"
+                  aria-controls="patientPane"
+                  onclick="HemoAuth.switchRole('patient')">
+            <i class="fa-solid fa-user-injured me-1"></i> Patient / Seeker
+          </button>
+        </div>
+      </div>
+
+      <!-- Card Body / Form (Requirement 2: Stagger 3 & 4) -->
+      <div class="card-body px-4 pt-2 pb-4">
+        
+        <!-- Role-Specific Dynamic Context Message Banner (Stagger 3) -->
+        <div class="role-context-banner mb-3 p-3 rounded-lg stagger-entrance-3" id="roleContextBanner">
+          <!-- Populated dynamically by switchRole in JS -->
+          <div class="d-flex align-center gap-2 text-xs">
+            <i class="fa-solid fa-circle-info text-primary fs-6"></i>
+            <span id="roleContextText">
+              <strong>Volunteer Donor Portal:</strong> Check donation cooldown, review emergency broadcasts, and update your availability status.
+            </span>
+          </div>
+        </div>
+
+        <!-- Login Form (Stagger 4) -->
+        <form action="/login" method="POST" id="authLoginForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleLoginSubmit(event)">
+          <input type="hidden" name="userRole" id="authRoleInput" value="{{ active_role or 'donor' }}">
+
+          <!-- Email Field -->
+          <div class="mb-3">
+            <label for="loginEmail" class="form-label small fw-semibold">Email Address or Phone *</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
+              <input type="text" class="form-control border-start-0 ps-0" id="loginEmail" name="email" placeholder="name@example.com" value="aarav.sharma@example.com" required>
+            </div>
+          </div>
+
+          <!-- Password Field with Toggle -->
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-center mb-1">
+              <label for="loginPassword" class="form-label small fw-semibold mb-0">Password *</label>
+              <a href="#" class="small text-decoration-none" onclick="HemoUI.showToast('Password Reset', 'Password recovery instructions sent to registered contact.', 'info'); return false;">Forgot?</a>
+            </div>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
+              <input type="password" class="form-control border-start-0 border-end-0 ps-0" id="loginPassword" name="password" placeholder="Enter security password" value="••••••••••••" required>
+              <button class="btn btn-outline-secondary border-start-0 text-muted" type="button" id="togglePasswordBtn" onclick="HemoAuth.togglePasswordVisibility('loginPassword', this)" aria-label="Toggle password view">
+                <i class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Role-Specific Secondary Field -->
+          <div class="mb-3" id="roleSpecificFieldGroup">
+            <!-- For Donor: quick availability status check preview -->
+            <div id="donorFieldSub">
+              <div class="form-check form-switch small">
+                <input class="form-check-input switch-input" type="checkbox" id="donorReadySwitch" checked>
+                <label class="form-check-label fw-medium ms-1" for="donorReadySwitch">
+                  Set status to <span class="badge badge-teal">Available for Dispatch</span> upon sign-in
+                </label>
+              </div>
+            </div>
+            <!-- For Patient / Hospital: Urgency selector preview -->
+            <div id="patientFieldSub" class="d-none">
+              <label for="patientUrgencySelect" class="form-label small fw-semibold">Current Blood Requirement Urgency</label>
+              <select class="form-select form-select-sm" id="patientUrgencySelect">
+                <option value="critical">Critical ICU Emergency (Immediate Dispatch)</option>
+                <option value="urgent">Urgent Need (Within 6-12 Hours)</option>
+                <option value="routine" selected>Scheduled Surgery / Routine Transfusion</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Remember Me -->
+          <div class="d-flex align-center justify-between mb-4 small">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="rememberMeCheck" checked>
+              <label class="form-check-label text-muted" for="rememberMeCheck">Keep me signed in</label>
+            </div>
+            <span class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> 256-bit SSL</span>
+          </div>
+
+          <!-- Submit Button with Heartbeat Loading Spinner (Requirement 5) -->
+          <button type="submit" class="btn btn-primary w-100 btn-lg d-flex align-center justify-center gap-2" id="loginSubmitBtn">
+            <span>Sign In to Portal</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+
+      </div>
+
+      <!-- Footer: Link to Register (Requirement 1: Role-aware registration link) -->
+      <div class="card-footer bg-light px-4 py-3 text-center border-top">
+        <p class="small text-muted mb-0">
+          New to HemoNexus? 
+          <a href="/register?role=donor" class="fw-semibold text-primary" id="registerRoleLink">
+            Register as a Volunteer Donor
+          </a>
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Quick Alternate Direct Link to Main Platform -->
+    <div class="text-center mt-3 stagger-entrance-4">
+      <a href="/home" class="small text-muted text-decoration-none">
+        <i class="fa-solid fa-house-medical me-1"></i> Explore Public Platform & Compatibility Visualizer &rarr;
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

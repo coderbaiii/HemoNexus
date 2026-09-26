@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Blood Requests - HemoNexus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Blood Requirement Requests</h1>
+    <p class="page-subtitle">Manage incoming hospital emergency orders, patient blood requests, and donor fulfillment pipelines.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/requests/new" class="btn btn-primary">
+      <i class="fa-solid fa-plus"></i> Create Blood Request
+    </a>
+  </div>
+</div>
+
+<!-- Request Filter Tabs -->
+<div class="card mb-6">
+  <div class="card-header bg-slate-50">
+    <div class="nav-tabs" style="border: none; margin: 0;">
+      <div class="nav-tab-item active" onclick="filterRequests('all')">All Requests (3)</div>
+      <div class="nav-tab-item" onclick="filterRequests('critical')">
+        <span class="text-danger fw-bold"><i class="fa-solid fa-circle-radiation"></i> Critical SOS (1)</span>
+      </div>
+      <div class="nav-tab-item" onclick="filterRequests('urgent')">Urgent (1)</div>
+      <div class="nav-tab-item" onclick="filterRequests('routine')">Routine (1)</div>
+      <div class="nav-tab-item" onclick="filterRequests('fulfilled')">Fulfilled</div>
+    </div>
+  </div>
+  
+  <div class="table-container" style="border: none; border-radius: 0;">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Request ID & Patient</th>
+          <th>Hospital Location</th>
+          <th>Blood Group & Component</th>
+          <th>Fulfillment Progress</th>
+          <th>Urgency</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="requestsTableBody">
+        {% for req in requests %}
+        <tr class="req-row" data-urgency="{{ req.urgency }}" data-status="{{ req.status }}">
+          <td>
+            <div class="fw-bold text-slate-900">{{ req.patientName }}</div>
+            <div class="text-xs text-muted text-mono">{{ req.id }} • Logged {{ req.createdAt }}</div>
+          </td>
+          <td>
+            <div class="text-sm fw-medium text-slate-800">{{ req.hospital }}</div>
+            <div class="text-xs text-muted"><i class="fa-solid fa-location-dot text-primary"></i> {{ req.location }}</div>
+          </td>
+          <td>
+            <div class="d-flex align-center gap-2">
+              <span class="blood-badge blood-badge-sm">{{ req.bloodGroup }}</span>
+              <span class="text-sm fw-semibold text-slate-800">{{ req.component }}</span>
+            </div>
+          </td>
+          <td style="min-width: 160px;">
+            <div class="d-flex align-center justify-between text-xs mb-1">
+              <span>{{ req.unitsFulfilled }} of {{ req.unitsNeeded }} Units</span>
+              <span class="fw-bold">{{ ((req.unitsFulfilled / req.unitsNeeded) * 100) | round | int }}%</span>
+            </div>
+            <div class="inventory-bar-track">
+              <div class="inventory-bar-fill" style="width: {{ ((req.unitsFulfilled / req.unitsNeeded) * 100) | round | int }}%; background-color: var(--primary);"></div>
+            </div>
+          </td>
+          <td>
+            {% if req.urgency == 'critical' %}
+              <span class="urgency-chip urgency-critical"><i class="fa-solid fa-circle-radiation"></i> Critical SOS</span>
+            {% elif req.urgency == 'urgent' %}
+              <span class="urgency-chip urgency-urgent"><i class="fa-solid fa-clock"></i> Urgent</span>
+            {% else %}
+              <span class="urgency-chip urgency-routine">Routine</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if req.status == 'in-progress' %}
+              <span class="badge badge-info"><i class="fa-solid fa-spinner animate-spin"></i> In Progress</span>
+            {% elif req.status == 'matched' %}
+              <span class="badge badge-warning"><i class="fa-solid fa-user-check"></i> Matched</span>
+            {% elif req.status == 'fulfilled' %}
+              <span class="badge badge-success"><i class="fa-solid fa-check"></i> Fulfilled</span>
+            {% else %}
+              <span class="badge badge-slate">Pending</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex align-center gap-2">
+              <a href="/match?group={{ req.bloodGroup }}&component={{ req.component }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Match
+              </a>
+              {% if req.urgency == 'critical' %}
+                <a href="/emergency" class="btn btn-emergency btn-sm" title="Launch SOS Broadcast">
+                  <i class="fa-solid fa-bullhorn"></i>
+                </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function filterRequests(type) {
+  const rows = document.querySelectorAll('.req-row');
+  rows.forEach(r => {
+    if (type === 'all') {
+      r.style.display = '';
+    } else if (type === 'fulfilled') {
+      r.style.display = r.getAttribute('data-status') === 'fulfilled' ? '' : 'none';
+    } else {
+      r.style.display = r.getAttribute('data-urgency') === type ? '' : 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

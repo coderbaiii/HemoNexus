@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Availability & Cooldown Tracker - HemoNexus{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Donor Availability & 90-Day Cooldown Tracker</h1>
+    <p class="page-subtitle">Manage medical donation intervals, temporary deferrals, and voluntary blood camp scheduling.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary" onclick="HemoUI.showToast('Schedule Camp', 'Donation camp coordinator notified.', 'success')">
+      <i class="fa-solid fa-calendar-plus"></i> Schedule Donation Camp
+    </button>
+  </div>
+</div>
+
+<div class="d-grid gap-6" style="grid-template-columns: 1fr 1fr;">
+  
+  <!-- Left Column: Cooldown Calculator -->
+  <div class="card">
+    <div class="card-header bg-slate-50">
+      <div class="d-flex align-center gap-2">
+        <i class="fa-solid fa-calculator text-primary text-xl"></i>
+        <div>
+          <h3 class="card-title">Donation Interval & Eligibility Calculator</h3>
+          <p class="card-subtitle">Calculates safe inter-donation cooldown according to health guidelines</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-6">
+      <form onsubmit="event.preventDefault(); calculateCooldown();">
+        <div class="form-group">
+          <label class="form-label">Donation Type</label>
+          <select class="form-select" id="calcDonationType" onchange="calculateCooldown()">
+            <option value="90">Whole Blood (90 Days / 3 Months Cooldown)</option>
+            <option value="14">Platelets / Apheresis (14 Days Cooldown)</option>
+            <option value="28">Plasma Donation (28 Days Cooldown)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Last Donation Date</label>
+          <input type="date" class="form-control" id="calcLastDate" value="2026-06-15" onchange="calculateCooldown()">
+        </div>
+
+        <div class="p-4 rounded-xl mt-4" style="background: var(--slate-50); border: 1px solid var(--border-color);">
+          <div class="d-flex align-center justify-between mb-2">
+            <span class="text-xs text-muted text-uppercase fw-semibold">Cooldown Progress</span>
+            <span class="text-xs fw-bold text-slate-800" id="calcDaysPassedText">73 / 90 Days Completed</span>
+          </div>
+          <div class="inventory-bar-track mb-3">
+            <div class="inventory-bar-fill" id="calcProgressBar" style="width: 81%; background-color: var(--warning);"></div>
+          </div>
+          <div class="d-flex align-center justify-between">
+            <span class="text-xs text-slate-600">Next Eligible Date:</span>
+            <span class="text-sm fw-extrabold text-primary" id="calcEligibleDate">September 13, 2026</span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Column: Medical Guidelines -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Clinical Deferral Guidelines</h3>
+      <span class="badge badge-info">Standard Protocol</span>
+    </div>
+    <div class="card-body p-6">
+      <div class="d-flex flex-column gap-4">
+        <div class="d-flex align-start gap-3">
+          <div class="stat-icon-wrapper stat-icon-primary" style="width: 2.25rem; height: 2.25rem; font-size: 1rem;">
+            <i class="fa-solid fa-droplet"></i>
+          </div>
+          <div>
+            <h4 class="text-sm fw-bold text-slate-900">Whole Blood Interval</h4>
+            <p class="text-xs text-slate-600">Minimum 90 days required for red cell replenishment and iron store restoration in males & females.</p>
+          </div>
+        </div>
+
+        <div class="d-flex align-start gap-3">
+          <div class="stat-icon-wrapper stat-icon-teal" style="width: 2.25rem; height: 2.25rem; font-size: 1rem;">
+            <i class="fa-solid fa-microscope"></i>
+          </div>
+          <div>
+            <h4 class="text-sm fw-bold text-slate-900">Platelet Apheresis</h4>
+            <p class="text-xs text-slate-600">Platelet levels regenerate within 48-72 hours. Donors may donate every 14 days up to 24 times per year.</p>
+          </div>
+        </div>
+
+        <div class="d-flex align-start gap-3">
+          <div class="stat-icon-wrapper stat-icon-warning" style="width: 2.25rem; height: 2.25rem; font-size: 1rem;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h4 class="text-sm fw-bold text-slate-900">Temporary Medical Deferrals</h4>
+            <p class="text-xs text-slate-600">Tattoo or piercing (6 months), dental surgery (72 hours), antibiotic medication (14 days post completion).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function calculateCooldown() {
+  const cooldownDays = parseInt(document.getElementById('calcDonationType').value);
+  const lastDateVal = document.getElementById('calcLastDate').value;
+  if (!lastDateVal) return;
+
+  const lastDate = new Date(lastDateVal);
+  const today = new Date('2026-08-27');
+  const nextDate = new Date(lastDate);
+  nextDate.setDate(nextDate.getDate() + cooldownDays);
+
+  const diffTime = today - lastDate;
+  const daysPassed = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+  const percent = Math.min(100, Math.round((daysPassed / cooldownDays) * 100));
+
+  const progressEl = document.getElementById('calcProgressBar');
+  const textEl = document.getElementById('calcDaysPassedText');
+  const dateEl = document.getElementById('calcEligibleDate');
+
+  if (progressEl) {
+    progressEl.style.width = percent + '%';
+    progressEl.style.backgroundColor = percent >= 100 ? 'var(--success)' : 'var(--warning)';
+  }
+  if (textEl) {
+    textEl.textContent = `${daysPassed} / ${cooldownDays} Days (${percent >= 100 ? 'Eligible Now' : 'In Cooldown'})`;
+  }
+  if (dateEl) {
+    dateEl.textContent = nextDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', calculateCooldown);
+</script>
+{% endblock %}

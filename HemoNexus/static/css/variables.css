@@ -1,0 +1,141 @@
+/* ==========================================================================
+   HemoNexus Design Tokens & Variables
+   Theme: Professional Medical-Tech Platform
+   Palette: Deep Navy Surface System with Crimson (#C81E3A) & Teal (#0E7C6B)
+   Typography: Fraunces (Headlines), Inter (UI/Body), IBM Plex Mono (Data)
+   ========================================================================== */
+
+:root {
+  /* Brand Crimson Palette (#C81E3A) - Primary Actions & Emergency */
+  --primary: #C81E3A;
+  --primary-hover: #E02444;
+  --primary-dark: #9E132B;
+  --primary-50: rgba(200, 30, 58, 0.08);
+  --primary-100: rgba(200, 30, 58, 0.15);
+  --primary-200: rgba(200, 30, 58, 0.25);
+  --primary-glow: rgba(200, 30, 58, 0.35);
+
+  /* HemoNexus Teal Palette (#0E7C6B) - STRICTLY for Verified / Available / Compatible */
+  --teal-500: #14B8A6;
+  --teal-600: #0E7C6B;
+  --teal-700: #0B6356;
+  --teal-800: #094F45;
+  --teal-glow: rgba(14, 124, 107, 0.35);
+  --teal-surface: rgba(14, 124, 107, 0.12);
+  --teal-border: rgba(14, 124, 107, 0.38);
+  --teal-text: #2DD4BF;
+  --teal-text-light: #5EEAD4;
+
+  /* Status Colors */
+  --success: #0E7C6B;
+  --success-bg: rgba(14, 124, 107, 0.15);
+  --success-border: rgba(14, 124, 107, 0.35);
+  --success-text: #2DD4BF;
+
+  --warning: #F59E0B;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.35);
+  --warning-text: #FCD34D;
+
+  --danger: #C81E3A;
+  --danger-bg: rgba(200, 30, 58, 0.15);
+  --danger-border: rgba(200, 30, 58, 0.35);
+  --danger-text: #FCA5A5;
+
+  --info: #0284C7;
+  --info-bg: rgba(2, 132, 199, 0.12);
+  --info-border: rgba(2, 132, 199, 0.35);
+  --info-text: #7DD3FC;
+
+  /* Dark Navy Layered Surface System */
+  --bg-app: #080D1A;               /* Deepest Midnight Navy base */
+  --bg-surface: #0E1628;           /* Primary surface layer */
+  --bg-surface-elevated: #131E35;  /* Hover / elevated layer */
+  --bg-card: #111B30;              /* Card container surface */
+  --bg-card-hover: #162442;        /* Interactive card hover */
+  --bg-input: #0A1122;             /* Input element background */
+  --bg-muted: #0D1526;             /* Muted element background */
+  --bg-header: rgba(10, 16, 30, 0.88); /* Frosted header */
+
+  /* Neutral Slate Scale */
+  --slate-50: #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A;
+  --slate-950: #020617;
+
+  /* Text Colors (High Contrast on Dark Navy) */
+  --text-main: #F8FAFC;            /* Pure readable bright white */
+  --text-muted: #94A3B8;           /* Clean readable slate-gray */
+  --text-subtle: #64748B;          /* Dim secondary text */
+  --text-inverse: #080D1A;
+
+  /* Borders & Dividers */
+  --border-color: rgba(255, 255, 255, 0.09);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-highlight: rgba(255, 255, 255, 0.18);
+  --border-focus: #C81E3A;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', Consolas, monospace;
+
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  --text-5xl: 3.25rem;   /* 52px */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* Elevation Shadows & Medical Glow */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 14px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 14px 28px rgba(0, 0, 0, 0.45), 0 4px 8px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 22px 38px rgba(0, 0, 0, 0.55), 0 8px 12px rgba(0, 0, 0, 0.35);
+  --shadow-crimson: 0 6px 20px rgba(200, 30, 58, 0.35);
+  --shadow-teal: 0 6px 20px rgba(14, 124, 107, 0.35);
+  --shadow-emergency: 0 0 25px rgba(200, 30, 58, 0.45);
+
+  /* Border Radii */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Layout Spacing */
+  --sidebar-width: 260px;
+  --header-height: 70px;
+  --content-max-width: 1360px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-indices */
+  --z-sticky: 100;
+  --z-header: 200;
+  --z-sidebar: 300;
+  --z-drawer: 400;
+  --z-modal-backdrop: 500;
+  --z-modal: 600;
+  --z-toast: 700;
+}
