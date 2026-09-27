@@ -111,7 +111,7 @@
             </span>
           </div>
 
-          <form onsubmit="event.preventDefault(); HemoUI.triggerMatchingSearchAnimation(document.getElementById('heroBloodGroupInput').value, document.getElementById('heroComponentSelect').value);">
+          <form onsubmit="event.preventDefault(); HemoUI.triggerMatchingSearchAnimation(document.getElementById('heroBloodGroupInput').value, document.getElementById('heroComponentSelect').value, document.getElementById('heroCitySelect').value);">
             <div class="form-group mb-3">
               <label class="form-label small fw-semibold" id="patientBloodGroupLabel">Patient Blood Group *</label>
               <div class="hero-blood-tiles-grid" role="radiogroup" aria-labelledby="patientBloodGroupLabel">
@@ -153,11 +153,28 @@
               </select>
             </div>
 
-            <div class="form-group mb-4">
-              <label class="form-label small fw-semibold">Destination Hospital / Clinic *</label>
-              <div class="input-group">
-                <span class="input-group-text bg-light border-end-0 text-primary"><i class="fa-solid fa-hospital"></i></span>
-                <input type="text" class="form-control border-start-0 ps-0" placeholder="Hospital name or area..." value="Lilavati Hospital & Research Centre, Mumbai" required>
+            <div class="row g-2 mb-4">
+              <div class="col-md-5">
+                <label class="form-label small fw-semibold">Select City / Location *</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0 text-primary"><i class="fa-solid fa-location-dot"></i></span>
+                  <select class="form-select border-start-0 ps-0" id="heroCitySelect">
+                    <option value="Kolkata" selected>Kolkata</option>
+                    <option value="Mumbai">Mumbai</option>
+                    <option value="Delhi">Delhi</option>
+                    <option value="Bengaluru">Bengaluru</option>
+                    <option value="Hyderabad">Hyderabad</option>
+                    <option value="Chennai">Chennai</option>
+                    <option value="Pune">Pune</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-7">
+                <label class="form-label small fw-semibold">Destination Hospital / Clinic *</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0 text-primary"><i class="fa-solid fa-hospital"></i></span>
+                  <input type="text" class="form-control border-start-0 ps-0" id="heroHospitalInput" placeholder="Hospital name..." value="AMRI Hospital, Kolkata" required>
+                </div>
               </div>
             </div>
 
@@ -253,7 +270,7 @@
           </div>
           <div class="node-meta">
             <span class="node-title">Hospital ICU</span>
-            <span class="node-desc" id="networkHospitalText">Lilavati Trauma Bay #3</span>
+            <span class="node-desc" id="networkHospitalText">AMRI Hospital Trauma Bay #3 (Kolkata)</span>
           </div>
         </div>
       </div>

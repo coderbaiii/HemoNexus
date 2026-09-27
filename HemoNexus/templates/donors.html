@@ -112,7 +112,7 @@ function renderDonorsList() {
   const status = document.getElementById('donorStatusFilter')?.value || '';
 
   const filtered = donors.filter(d => {
-    const matchesQuery = !query || d.name.toLowerCase().includes(query) || d.area.toLowerCase().includes(query) || d.phone.includes(query);
+    const matchesQuery = !query || d.name.toLowerCase().includes(query) || d.area.toLowerCase().includes(query) || (d.city && d.city.toLowerCase().includes(query)) || d.phone.includes(query);
     const matchesBlood = !blood || d.bloodGroup === blood;
     const matchesStatus = !status || d.status === status;
     return matchesQuery && matchesBlood && matchesStatus;
@@ -160,7 +160,7 @@ function renderDonorsList() {
             <span class="blood-badge blood-badge-sm">${d.bloodGroup}</span>
           </td>
           <td>
-            <div class="text-sm fw-medium text-slate-800">${d.area}</div>
+            <div class="text-sm fw-medium text-slate-800">${d.area}, ${d.city || 'Kolkata'}</div>
             <div class="text-xs text-muted"><i class="fa-solid fa-location-arrow text-primary"></i> ${d.distanceKm} km away</div>
           </td>
           <td>

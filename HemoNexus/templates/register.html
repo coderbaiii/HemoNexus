@@ -3,9 +3,72 @@
 {% block title %}HemoNexus - Register New Account | Donor & Patient Registration{% endblock %}
 {% block body_class %}auth-body{% endblock %}
 
+{% block extra_head %}
+<style>
+  body.auth-body {
+    background-color: #ffffff !important;
+    background-image: radial-gradient(ellipse 140% 140% at 50% 50%,
+      #ffffff 0%,
+      #ffffff 78%,
+      rgba(243, 213, 218, 0.3) 88%,
+      rgba(200, 30, 58, 0.18) 95%,
+      rgba(101, 6, 23, 0.35) 100%
+    ) !important;
+    background-attachment: fixed !important;
+    min-height: 100vh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    overflow-x: hidden !important;
+  }
+  body.auth-body #networkCanvas,
+  body.auth-body canvas {
+    display: none !important;
+  }
+
+  /* Left-to-Right: arm enters from left edge, extends across full viewport */
+  .auth-bg-image-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
+    opacity: 0.72;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .auth-bg-image-asset {
+    width: 95vw;
+    max-width: none;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+    filter: contrast(1.05) saturate(1.1);
+    transform: translateX(-2vw);
+  }
+
+  @media (max-width: 991px) {
+    .auth-bg-image-asset {
+      width: 140vw;
+      transform: translateX(-4vw);
+      opacity: 0.55;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block public_content %}
-<div class="auth-page-wrapper d-flex align-center justify-center min-vh-100 py-5">
-  <div class="container" style="max-width: 560px; position: relative; z-index: 2;">
+<!-- Background Arm + Hand + Blood Drop artwork -->
+<div class="auth-bg-image-layer" aria-hidden="true">
+  <img src="/static/images/blood_hand_artwork_transparent.png" alt="" class="auth-bg-image-asset">
+</div>
+
+<div class="auth-page-wrapper d-flex align-center justify-center min-vh-100 py-5" style="background: transparent !important; background-color: transparent !important; position: relative; z-index: 10;">
+  <div class="container" style="max-width: 560px; position: relative; z-index: 10;">
     
     <!-- Brand / Eyebrow (Stagger 1) -->
     <div class="text-center mb-4 stagger-entrance-1">
@@ -30,7 +93,17 @@
       
       <!-- Card Header (Stagger 2) -->
       <div class="card-header bg-white border-0 pt-4 pb-2 px-4 text-center stagger-entrance-2">
-        <h1 class="h3 fw-bold mb-1" id="registerHeaderTitle">Create Account</h1>
+        <!-- User Status Selector (Registered User vs New User) -->
+        <div class="user-status-selector mb-3 p-1 rounded-pill bg-light d-flex align-center justify-center gap-1 border">
+          <a href="/login" class="btn btn-sm text-muted rounded-pill flex-1 fw-semibold">
+            <i class="fa-solid fa-user-check me-1"></i> Registered User
+          </a>
+          <a href="/register" class="btn btn-sm btn-primary rounded-pill flex-1 fw-semibold shadow-sm">
+            <i class="fa-solid fa-user-plus me-1"></i> New User
+          </a>
+        </div>
+
+        <h1 class="h4 fw-bold mb-1" id="registerHeaderTitle">Create New Account</h1>
         <p class="text-muted small mb-3" id="registerHeaderSubtitle">Join thousands of verified donors and emergency hospital networks</p>
 
         <!-- Role Toggle Pills -->
@@ -39,13 +112,13 @@
                   class="role-pill-btn {% if active_role != 'patient' %}active{% endif %}" 
                   id="regToggleDonorBtn" 
                   onclick="HemoAuth.switchRegRole('donor')">
-            <i class="fa-solid fa-heart-pulse me-1"></i> Register as Donor
+            <i class="fa-solid fa-heart-pulse me-1"></i> Donor
           </button>
           <button type="button" 
                   class="role-pill-btn {% if active_role == 'patient' %}active{% endif %}" 
                   id="regTogglePatientBtn" 
                   onclick="HemoAuth.switchRegRole('patient')">
-            <i class="fa-solid fa-user-injured me-1"></i> Register as Patient / Hospital
+            <i class="fa-solid fa-user-injured me-1"></i> Patient / Requester
           </button>
         </div>
       </div>

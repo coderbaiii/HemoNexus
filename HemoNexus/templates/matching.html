@@ -22,12 +22,26 @@
       <i class="fa-solid fa-sliders text-primary text-xl"></i>
       <div>
         <h3 class="card-title">Patient Requirement Parameters</h3>
-        <p class="card-subtitle">Adjust criteria to dynamically rank compatible donors</p>
+        <p class="card-subtitle">Adjust location and criteria to dynamically rank compatible donors</p>
       </div>
     </div>
   </div>
   <div class="card-body p-6">
-    <div class="d-grid grid-4 gap-4">
+    <div class="d-grid grid-4 gap-4 mb-3">
+      <div class="form-group">
+        <label class="form-label">Target City / Location *</label>
+        <select class="form-select" id="matchCityLocation" onchange="runMatchAlgorithm()">
+          <option value="Kolkata">Kolkata</option>
+          <option value="Mumbai">Mumbai</option>
+          <option value="Delhi">Delhi</option>
+          <option value="Bengaluru">Bengaluru</option>
+          <option value="Hyderabad">Hyderabad</option>
+          <option value="Chennai">Chennai</option>
+          <option value="Pune">Pune</option>
+          <option value="All">All Cities</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Patient Blood Group *</label>
         <select class="form-select" id="matchRecipientGroup" onchange="runMatchAlgorithm()">
@@ -56,15 +70,17 @@
         <label class="form-label">Max Proximity Distance (<span id="radiusVal">15</span> km)</label>
         <input type="range" class="form-control" id="matchRadius" min="2" max="30" value="15" oninput="document.getElementById('radiusVal').textContent = this.value; runMatchAlgorithm();" style="padding: 0.25rem;">
       </div>
+    </div>
 
-      <div class="form-group">
-        <label class="form-label">Donor Verification</label>
-        <label class="switch-label mt-2">
-          <input type="checkbox" class="switch-input" id="matchVerifiedOnly" checked onchange="runMatchAlgorithm()">
-          <span class="switch-slider"></span>
-          <span class="text-xs fw-semibold text-slate-700">Verified Donors Only</span>
-        </label>
+    <div class="d-flex align-center justify-between pt-2 border-top">
+      <div class="text-xs text-muted">
+        <i class="fa-solid fa-location-dot text-primary me-1"></i> Donors will be ranked by proximity to selected city location.
       </div>
+      <label class="switch-label">
+        <input type="checkbox" class="switch-input" id="matchVerifiedOnly" checked onchange="runMatchAlgorithm()">
+        <span class="switch-slider"></span>
+        <span class="text-xs fw-semibold text-slate-700">Verified Donors Only</span>
+      </label>
     </div>
   </div>
 </div>
@@ -97,6 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const group = urlParams.get('group');
   const comp = urlParams.get('component');
+  const city = urlParams.get('city');
+
+  if (city && document.getElementById('matchCityLocation')) {
+    document.getElementById('matchCityLocation').value = city;
+  } else if (document.getElementById('matchCityLocation')) {
+    document.getElementById('matchCityLocation').value = 'Kolkata';
+  }
 
   if (group && document.getElementById('matchRecipientGroup')) {
     document.getElementById('matchRecipientGroup').value = group;
@@ -111,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function runMatchAlgorithm() {
   const recipientGroup = document.getElementById('matchRecipientGroup').value;
   const component = document.getElementById('matchComponent').value;
+  const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
   const maxDistanceKm = parseInt(document.getElementById('matchRadius').value);
   const verifiedOnly = document.getElementById('matchVerifiedOnly').checked;
 
@@ -120,10 +144,23 @@ function runMatchAlgorithm() {
     maxDistanceKm
   });
 
-  const filtered = verifiedOnly ? results.filter(r => r.donor.verified) : results;
+  // Filter by selected city location if specific city selected
+  let filtered = results;
+  if (selectedCity && selectedCity !== 'All') {
+    const cityMatches = results.filter(r => r.donor.city && r.donor.city.toLowerCase() === selectedCity.toLowerCase());
+    // If exact city matches exist, use them; otherwise show all with location note
+    filtered = cityMatches.length > 0 ? cityMatches : results;
+  }
+
+  if (verifiedOnly) {
+    filtered = filtered.filter(r => r.donor.verified);
+  }
 
   const badge = document.getElementById('matchFoundBadge');
-  if (badge) badge.textContent = `${filtered.length} Optimal Matches Found`;
+  if (badge) {
+    const cityText = selectedCity !== 'All' ? ` in ${selectedCity}` : '';
+    badge.textContent = `${filtered.length} Optimal Matches Found${cityText}`;
+  }
 
   const container = document.getElementById('matchResultsContainer');
   if (!container) return;
@@ -132,11 +169,11 @@ function runMatchAlgorithm() {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon"><i class="fa-solid fa-satellite-dish text-primary animate-pulse-sos"></i></div>
-        <div class="empty-state-title">No Compatible Donors Found Nearby</div>
-        <p class="empty-state-desc">No registered eligible donors match the specified proximity limit. Expand the radius or broadcast an emergency alert.</p>
+        <div class="empty-state-title">No Compatible Donors Found in ${selectedCity}</div>
+        <p class="empty-state-desc">No registered eligible donors match the specified proximity limit in ${selectedCity}. Try selecting 'All Cities', expanding radius, or launching an emergency alert.</p>
         <div class="d-flex align-center justify-center gap-2 flex-wrap">
-          <button class="btn btn-primary btn-sm" onclick="document.getElementById('matchRadius').value = 30; document.getElementById('radiusVal').textContent = '30'; runMatchAlgorithm();">
-            <i class="fa-solid fa-arrows-up-down-left-right me-1"></i> Widen Search Radius (30 km)
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('matchCityLocation').value = 'All'; runMatchAlgorithm();">
+            <i class="fa-solid fa-earth-asia me-1"></i> Search All Cities
           </button>
           <a href="/emergency" class="btn btn-emergency btn-sm">
             <i class="fa-solid fa-radiation me-1"></i> Launch Emergency Broadcast
@@ -169,7 +206,7 @@ function runMatchAlgorithm() {
             </div>
 
             <div class="text-xs text-muted mb-2">
-              <i class="fa-solid fa-location-dot text-primary"></i> ${item.donor.area} • ${item.donor.distanceKm} km away • ${item.donor.phone}
+              <i class="fa-solid fa-location-dot text-primary"></i> ${item.donor.area}, <strong>${item.donor.city || selectedCity}</strong> • ${item.donor.distanceKm} km away • ${item.donor.phone}
             </div>
 
             <div class="match-reasons-list">
@@ -182,7 +219,7 @@ function runMatchAlgorithm() {
           <button class="btn btn-primary btn-sm justify-center" onclick="dispatchDirectMatch('${item.donor.name}', '${item.donor.bloodGroup}')">
             <i class="fa-solid fa-paper-plane"></i> Dispatch
           </button>
-          <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${item.donor.name}', '${item.donor.bloodGroup}', '${item.donor.phone}', '${item.donor.area}')">
+          <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${item.donor.name}', '${item.donor.bloodGroup}', '${item.donor.phone}', '${item.donor.area}, ${item.donor.city}')">
             <i class="fa-solid fa-phone"></i> Contact
           </button>
         </div>

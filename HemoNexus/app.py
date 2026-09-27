@@ -26,8 +26,8 @@ DONORS = [
         "age": 29,
         "phone": "+91 98765 43210",
         "email": "aarav.sharma@example.com",
-        "city": "Mumbai",
-        "area": "Andheri West",
+        "city": "Kolkata",
+        "area": "Park Street",
         "distanceKm": 2.4,
         "status": "available",
         "verified": True,
@@ -46,8 +46,8 @@ DONORS = [
         "age": 26,
         "phone": "+91 98123 45678",
         "email": "pooja.nair@example.com",
-        "city": "Mumbai",
-        "area": "Bandra West",
+        "city": "Kolkata",
+        "area": "Salt Lake Sector V",
         "distanceKm": 4.1,
         "status": "available",
         "verified": True,
@@ -66,8 +66,8 @@ DONORS = [
         "age": 34,
         "phone": "+91 97654 32109",
         "email": "rohan.d@example.com",
-        "city": "Mumbai",
-        "area": "Powai",
+        "city": "Kolkata",
+        "area": "Bhowanipore",
         "distanceKm": 7.8,
         "status": "cooldown",
         "verified": True,
@@ -86,8 +86,8 @@ DONORS = [
         "age": 24,
         "phone": "+91 98450 11223",
         "email": "ananya.s@example.com",
-        "city": "Mumbai",
-        "area": "Dadar",
+        "city": "Kolkata",
+        "area": "New Town",
         "distanceKm": 3.5,
         "status": "available",
         "verified": True,
@@ -107,7 +107,7 @@ DONORS = [
         "phone": "+91 98200 99887",
         "email": "vikram.m@example.com",
         "city": "Mumbai",
-        "area": "Juhu",
+        "area": "Andheri West",
         "distanceKm": 1.8,
         "status": "available",
         "verified": True,
@@ -126,8 +126,8 @@ DONORS = [
         "age": 31,
         "phone": "+91 98980 44556",
         "email": "kavita.p@example.com",
-        "city": "Mumbai",
-        "area": "Goregaon",
+        "city": "Delhi",
+        "area": "Connaught Place",
         "distanceKm": 6.2,
         "status": "available",
         "verified": True,
@@ -148,8 +148,8 @@ REQUESTS = [
         "component": "Whole Blood",
         "unitsNeeded": 3,
         "unitsFulfilled": 2,
-        "hospital": "Lilavati Hospital & Research Centre",
-        "location": "Bandra, Mumbai",
+        "hospital": "AMRI Hospital, Dhakuria",
+        "location": "Park Street, Kolkata",
         "urgency": "critical",
         "status": "in-progress",
         "requiredBy": "2026-08-27 04:00 AM",
@@ -163,8 +163,8 @@ REQUESTS = [
         "component": "Platelets",
         "unitsNeeded": 2,
         "unitsFulfilled": 1,
-        "hospital": "Tata Memorial Hospital",
-        "location": "Parel, Mumbai",
+        "hospital": "Tata Medical Center",
+        "location": "New Town, Kolkata",
         "urgency": "urgent",
         "status": "matched",
         "requiredBy": "2026-08-27 10:00 AM",
@@ -178,8 +178,8 @@ REQUESTS = [
         "component": "RBC",
         "unitsNeeded": 2,
         "unitsFulfilled": 2,
-        "hospital": "Kokilaben Dhirubhai Ambani Hospital",
-        "location": "Andheri West, Mumbai",
+        "hospital": "SSKM Hospital",
+        "location": "Bhowanipore, Kolkata",
         "urgency": "routine",
         "status": "fulfilled",
         "requiredBy": "2026-08-27 02:00 PM",
@@ -191,14 +191,14 @@ REQUESTS = [
 ACTIVITIES = [
     {
         "title": "Donor Dispatch Confirmed",
-        "desc": "Aarav Sharma accepted emergency request REQ-4091 for Lilavati Hospital.",
+        "desc": "Aarav Sharma accepted emergency request REQ-4091 for AMRI Hospital.",
         "time": "12 mins ago",
         "icon": "fa-truck-medical",
         "iconClass": "stat-icon-primary"
     },
     {
         "title": "New Blood Request Registered",
-        "desc": "Emergency O- Whole Blood request logged by Lilavati ICU.",
+        "desc": "Emergency O- Whole Blood request logged by AMRI ICU.",
         "time": "45 mins ago",
         "icon": "fa-droplet",
         "iconClass": "stat-icon-danger"
@@ -226,7 +226,7 @@ def index():
 def login():
     if request.method == 'POST':
         role = request.form.get('userRole', 'donor')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('home'))
     role = request.args.get('role', 'donor')
     return render_template('login.html', is_public_page=True, active_page='login', active_role=role)
 
@@ -235,7 +235,7 @@ def login():
 @app.route('/register.html', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('home'))
     role = request.args.get('role', 'donor')
     return render_template('register.html', is_public_page=True, active_page='register', active_role=role)
 
@@ -346,7 +346,7 @@ def availability():
 
 @app.errorhandler(404)
 def page_not_found(e):
-    return redirect(url_for('home'))
+    return redirect(url_for('login'))
 
 
 if __name__ == '__main__':

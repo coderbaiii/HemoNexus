@@ -31,11 +31,13 @@ const HemoAuth = (() => {
     const patientFields = document.getElementById('patientFieldSub');
 
     if (isDonor) {
-      if (titleEl) titleEl.textContent = 'Donor Portal Sign In';
-      if (subtitleEl) subtitleEl.textContent = 'Sign in to access your verified HemoNexus donor profile & cooldown tracker';
+      if (titleEl) titleEl.textContent = 'Portal Sign In';
+      if (subtitleEl) subtitleEl.textContent = 'Access your HemoNexus clinical network profile';
       if (contextText) {
         contextText.innerHTML = '<strong>Volunteer Donor Portal:</strong> Check donation cooldown, review emergency broadcasts, and manage your availability status.';
       }
+      const previewEl = document.getElementById('rolePreviewText');
+      if (previewEl) previewEl.textContent = 'View donation cooldown, availability status, and nearby blood requests.';
       if (regLink) {
         regLink.href = '/register?role=donor';
         regLink.textContent = 'Register as a Volunteer Donor';
@@ -43,11 +45,13 @@ const HemoAuth = (() => {
       if (donorFields) donorFields.classList.remove('d-none');
       if (patientFields) patientFields.classList.add('d-none');
     } else {
-      if (titleEl) titleEl.textContent = 'Patient & Hospital Sign In';
-      if (subtitleEl) subtitleEl.textContent = 'Sign in to request urgent blood units & track live donor dispatches';
+      if (titleEl) titleEl.textContent = 'Portal Sign In';
+      if (subtitleEl) subtitleEl.textContent = 'Access your HemoNexus clinical network profile';
       if (contextText) {
         contextText.innerHTML = '<strong>Emergency Blood Seeker Portal:</strong> Broadcast critical blood requirements directly to compatible nearby donors.';
       }
+      const previewEl = document.getElementById('rolePreviewText');
+      if (previewEl) previewEl.textContent = 'Find compatible donors and create blood requests based on your requirements.';
       if (regLink) {
         regLink.href = '/register?role=patient';
         regLink.textContent = 'Register as a Patient or Hospital';
@@ -218,7 +222,7 @@ const HemoUI = (() => {
    * REQUIREMENT 5: Search Compatible Donors Animation
    * Professional multi-step ECG and heuristic matching sequence
    */
-  const triggerMatchingSearchAnimation = (bloodGroup = 'O-', component = 'Whole Blood', destinationUrl = null) => {
+  const triggerMatchingSearchAnimation = (bloodGroup = 'O-', component = 'Whole Blood', cityOrUrl = null) => {
     const modalId = 'searchMatchingModal';
     openModal(modalId);
 
@@ -270,7 +274,12 @@ const HemoUI = (() => {
           // All steps complete -> transition to match view
           setTimeout(() => {
             closeModal(modalId);
-            const target = destinationUrl || `/match?group=${encodeURIComponent(bloodGroup)}&component=${encodeURIComponent(component)}`;
+            let target = `/match?group=${encodeURIComponent(bloodGroup)}&component=${encodeURIComponent(component)}`;
+            if (cityOrUrl && cityOrUrl.startsWith('/')) {
+              target = cityOrUrl;
+            } else if (cityOrUrl) {
+              target += `&city=${encodeURIComponent(cityOrUrl)}`;
+            }
             window.location.href = target;
           }, 350);
         }
