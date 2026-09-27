@@ -1681,11 +1681,48 @@ code, kbd, samp, pre {
 /* --------------------------------------------------------------------------
    12. Role-Based Login & Register Styles (Requirement 1)
    -------------------------------------------------------------------------- */
-.auth-page-wrapper {
-  background-color: var(--bg);
+  .auth-page-wrapper {
+  background:
+    linear-gradient(90deg, rgba(143, 18, 41, 0.38) 0%, rgba(200, 30, 58, 0.15) 11%, rgba(255, 255, 255, 0) 27%, rgba(255, 255, 255, 0) 73%, rgba(200, 30, 58, 0.15) 89%, rgba(143, 18, 41, 0.38) 100%),
+    radial-gradient(ellipse at 0% 0%, rgba(143, 18, 41, 0.28), transparent 34%),
+    radial-gradient(ellipse at 100% 100%, rgba(143, 18, 41, 0.24), transparent 36%),
+    var(--white);
   position: relative;
+  isolation: isolate;
   overflow: hidden;
-}
+  }
+
+  .auth-page-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url('/static/images/login-arm-blood-drop.png') no-repeat 78% 72% / min(70vw, 920px) auto;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  }
+
+  .auth-page-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.72) 28%, rgba(255, 255, 255, 0.72) 72%, rgba(255, 255, 255, 0.12));
+  pointer-events: none;
+  }
+
+  .auth-body .auth-page-wrapper > .container {
+  z-index: 2;
+  }
+
+  @media (max-width: 700px) {
+  .auth-page-wrapper::before {
+    background-position: 120% 86%;
+    background-size: 760px auto;
+    opacity: 0.12;
+  }
+  }
 
 .auth-card {
   border-radius: var(--radius-2xl) !important;
