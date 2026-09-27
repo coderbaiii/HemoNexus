@@ -1,5 +1,5 @@
 """
-Bridge module for backend.database delegating to database/db.py.
+HEMONEXAS Database Package
 """
 from database.db import get_db, close_db, query_db, execute_db, init_db
 

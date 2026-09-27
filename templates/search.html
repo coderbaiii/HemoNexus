@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Smart Donor Search — HEMONEXAS{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 1.8rem; color: var(--text-main);">&#128269; Requirement-Based Donor Search</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">
+      Find and filter verified active donors using the 10-step matching engine.
+    </p>
+  </div>
+</div>
+
+<div class="grid-2" style="align-items: start;">
+  <!-- Search Filters Form -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">&#9881; Search Parameters & Filters</h3>
+    </div>
+
+    <form id="searchDonorsForm">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="s_blood">Required Blood Group *</label>
+          <select id="s_blood" name="blood_group" class="form-control" required>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+" selected>O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="s_radius">Search Radius (km)</label>
+          <input type="number" id="s_radius" name="preferred_max_distance" class="form-control" value="25" min="1" max="150" step="1">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="s_sort">Sorting Preference</label>
+          <select id="s_sort" name="sorting_preference" class="form-control">
+            <option value="BEST_MATCH" selected>Best Match (Multi-Criteria Score)</option>
+            <option value="NEAREST">Nearest Distance (km)</option>
+            <option value="FASTEST">Fastest (Estimated Travel Time)</option>
+            <option value="RECENTLY_VERIFIED">Recently Verified (Freshness)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="s_avail">Availability Window</label>
+          <select id="s_avail" name="availability_preference" class="form-control">
+            <option value="ANY" selected>Any Active Schedule</option>
+            <option value="24_HOURS">24 Hours (All Day)</option>
+            <option value="DAY">Daytime (08:00 - 18:00)</option>
+            <option value="NIGHT">Nighttime (18:00 - 06:00)</option>
+            <option value="8_HOURS">8-Hour Shift (09:00 - 17:00)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="s_hospital">Hospital / Patient Location</label>
+        <input type="text" id="s_hospital" name="location" class="form-control" placeholder="Apollo Multispecialty Hospital, Kolkata" value="Apollo Hospital, EM Bypass, Kolkata">
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="s_lat">Latitude (GPS)</label>
+          <input type="number" id="s_lat" name="latitude" class="form-control" value="22.5697" step="0.0001">
+        </div>
+        <div class="form-group">
+          <label for="s_lon">Longitude (GPS)</label>
+          <input type="number" id="s_lon" name="longitude" class="form-control" value="88.4046" step="0.0001">
+        </div>
+      </div>
+
+      <button type="submit" id="searchSubmitBtn" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; padding: 0.7rem;">
+        &#129517; Execute Smart Donor Search
+      </button>
+    </form>
+  </div>
+
+  <!-- Search Results Display Area -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">&#128203; Search Results</h3>
+      <span id="resultsCountBadge" class="badge badge-info" style="display: none;">0 Matches</span>
+    </div>
+
+    <div id="searchPlaceholder" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">&#129656;</div>
+      <p>Configure search filters and click <strong>Execute Smart Donor Search</strong> to view suitable active donors.</p>
+    </div>
+
+    <div id="searchLoading" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted);">
+      <div class="spinner" style="margin: 0 auto 0.8rem;"></div>
+      <p>Running 10-step matching & ranking pipeline across active donor registry...</p>
+    </div>
+
+    <div id="noResultsMsg" style="display: none; text-align: center; padding: 2.5rem 1rem; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px;">
+      <h4 style="color: #c53030; margin-bottom: 0.5rem;">&#9888; No suitable active donors found.</h4>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        No active verified donors match your specific blood group, distance radius, or availability criteria.
+        Try increasing the search radius or choosing "Any Active Schedule".
+      </p>
+    </div>
+
+    <div id="searchResultsList" style="display: none; display: flex; flex-direction: column; gap: 1rem;"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+<script>
+  initSearchPage();
+</script>
+{% endblock %}

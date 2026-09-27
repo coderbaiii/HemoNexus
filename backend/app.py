@@ -1,29 +1,39 @@
 import sys
 from pathlib import Path
 
-# Add project root to sys.path for direct execution
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Add project root to sys.path
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
 
 import os
 from flask import Flask, jsonify, request, render_template, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from backend.config import Config
-from backend.database import get_db, close_db, query_db, execute_db
-from backend.init_db import init_database
-from backend.routes.auth import auth_bp
-from backend.routes.donor import donor_bp
-from backend.routes.patient import patient_bp
-from backend.routes.admin import admin_bp
-from backend.routes.web import web_bp
+from config import Config
+from database.db import get_db, close_db, query_db, execute_db, init_db
+from routes.auth import auth_bp
+from routes.donor import donor_bp
+from routes.patient import patient_bp
+from routes.admin import admin_bp
+from routes.search import search_bp
+from routes.notifications import notifications_bp
+from routes.chatbot import chatbot_bp
+from routes.web import web_bp
 
 def create_app(config_class=Config):
     """
     Application factory for HEMONEXAS Flask platform.
     """
+    # Prefer root templates/static if present, otherwise backend templates/static
+    root_tpl = BASE_DIR / "templates"
+    root_static = BASE_DIR / "static"
+    
+    template_dir = str(root_tpl if root_tpl.exists() else Path(__file__).resolve().parent / "templates")
+    static_dir = str(root_static if root_static.exists() else Path(__file__).resolve().parent / "static")
+
     app = Flask(
         __name__,
-        template_folder=str(Path(__file__).resolve().parent / "templates"),
-        static_folder=str(Path(__file__).resolve().parent / "static")
+        template_folder=template_dir,
+        static_folder=static_dir
     )
     app.config.from_object(config_class)
 
@@ -35,6 +45,9 @@ def create_app(config_class=Config):
     app.register_blueprint(donor_bp)
     app.register_blueprint(patient_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(search_bp)
+    app.register_blueprint(notifications_bp)
+    app.register_blueprint(chatbot_bp)
     app.register_blueprint(web_bp)
 
     # Ensure database schema is initialized if file doesn't exist
@@ -43,7 +56,7 @@ def create_app(config_class=Config):
         if not db_path.exists():
             db_path.parent.mkdir(parents=True, exist_ok=True)
             with app.app_context():
-                init_database(str(db_path), seed_demo=True)
+                init_db(str(db_path), seed=True)
 
     # API Error Handlers
     @app.errorhandler(400)

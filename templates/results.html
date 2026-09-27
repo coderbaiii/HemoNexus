@@ -1,0 +1,62 @@
+<!-- Reusable Donor Result Cards Snippet -->
+{% if results and results|length > 0 %}
+  <div class="results-container">
+    <div style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.95rem;">
+      Found <strong>{{ results|length }}</strong> suitable active donor(s) satisfying all requirements.
+    </div>
+    {% for donor in results %}
+      <div class="card result-card" style="margin-bottom: 1rem; border-left: 4px solid var(--primary);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.8rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span class="badge badge-blood">{{ donor.blood_group }}</span>
+              <h4 style="margin: 0; font-size: 1.15rem; color: var(--text-main);">
+                #{{ donor.rank }} {{ donor.full_name }}
+              </h4>
+              {% if donor.profile_status == 'ACTIVE' %}
+                <span class="badge badge-active">&#10003; Active & Verified</span>
+              {% else %}
+                <span class="badge badge-due">{{ donor.profile_status }}</span>
+              {% endif %}
+            </div>
+            <div style="margin-top: 0.4rem; font-size: 0.88rem; color: var(--text-muted);">
+              &#128205; {{ donor.masked_location }} &bull; ~{{ donor.approximate_distance_km }} km away
+              {% if donor.estimated_travel_time is not none %}
+                &bull; <span style="color: var(--primary-dark); font-weight: 500;">~{{ donor.estimated_travel_time }} mins travel (estimated)</span>
+              {% endif %}
+            </div>
+          </div>
+          {% if donor.match_score is not none %}
+            <div style="text-align: right;">
+              <div style="font-size: 1.4rem; font-weight: 700; color: var(--primary);">{{ donor.match_score }}%</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Match Score</div>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="grid-3" style="margin-top: 0.8rem; background: #f8fafc; padding: 0.6rem; border-radius: 6px; font-size: 0.84rem;">
+          <div>
+            <strong>Schedule:</strong> {{ donor.availability_label or donor.availability }}
+          </div>
+          <div>
+            <strong>Max Travel:</strong> Up to {{ donor.maximum_travel_distance }} km
+          </div>
+          <div>
+            <strong>Last Verified:</strong> {{ donor.last_verified_date[:10] if donor.last_verified_date else 'Recent' }}
+          </div>
+        </div>
+
+        <div style="margin-top: 0.6rem; font-size: 0.75rem; color: #718096; font-style: italic;">
+          &#9888; {{ donor.medical_disclaimer }}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div style="text-align: center; padding: 2rem; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px;">
+    <h4 style="color: #c53030;">No suitable active donors found.</h4>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+      No active donors currently satisfy the blood group, search radius, and schedule availability requirements.
+    </p>
+  </div>
+{% endif %}
