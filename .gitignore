@@ -29,3 +29,6 @@ htmlcov/
 
 # Project specific
 .git-backup/
+
+# Archives
+*.zip
