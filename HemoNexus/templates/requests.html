@@ -17,16 +17,19 @@
 
 <!-- Request Filter Tabs -->
 <div class="card mb-6">
-  <div class="card-header bg-slate-50">
+  <div class="card-header bg-slate-50 d-flex align-center justify-between flex-wrap gap-2">
     <div class="nav-tabs" style="border: none; margin: 0;">
-      <div class="nav-tab-item active" onclick="filterRequests('all')">All Requests (3)</div>
-      <div class="nav-tab-item" onclick="filterRequests('critical')">
-        <span class="text-danger fw-bold"><i class="fa-solid fa-circle-radiation"></i> Critical SOS (1)</span>
+      <div class="nav-tab-item active" id="tabAll" onclick="filterRequests('all')">All Requests (<span id="countAll">--</span>)</div>
+      <div class="nav-tab-item" id="tabCritical" onclick="filterRequests('CRITICAL')">
+        <span class="text-danger fw-bold"><i class="fa-solid fa-circle-radiation"></i> Critical SOS (<span id="countCritical">0</span>)</span>
       </div>
-      <div class="nav-tab-item" onclick="filterRequests('urgent')">Urgent (1)</div>
-      <div class="nav-tab-item" onclick="filterRequests('routine')">Routine (1)</div>
-      <div class="nav-tab-item" onclick="filterRequests('fulfilled')">Fulfilled</div>
+      <div class="nav-tab-item" id="tabUrgent" onclick="filterRequests('URGENT')">Urgent (<span id="countUrgent">0</span>)</div>
+      <div class="nav-tab-item" id="tabRoutine" onclick="filterRequests('NORMAL')">Routine (<span id="countRoutine">0</span>)</div>
+      <div class="nav-tab-item" id="tabFulfilled" onclick="filterRequests('FULFILLED')">Fulfilled (<span id="countFulfilled">0</span>)</div>
     </div>
+    <button class="btn btn-outline-primary btn-sm" onclick="loadRealRequestsTable()">
+      <i class="fa-solid fa-rotate-right"></i> Refresh
+    </button>
   </div>
   
   <div class="table-container" style="border: none; border-radius: 0;">
@@ -35,73 +38,19 @@
         <tr>
           <th>Request ID & Patient</th>
           <th>Hospital Location</th>
-          <th>Blood Group & Component</th>
-          <th>Fulfillment Progress</th>
+          <th>Blood Group & Units</th>
+          <th>Dispatch / Fulfillment</th>
           <th>Urgency</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody id="requestsTableBody">
-        {% for req in requests %}
-        <tr class="req-row" data-urgency="{{ req.urgency }}" data-status="{{ req.status }}">
-          <td>
-            <div class="fw-bold text-slate-900">{{ req.patientName }}</div>
-            <div class="text-xs text-muted text-mono">{{ req.id }} • Logged {{ req.createdAt }}</div>
-          </td>
-          <td>
-            <div class="text-sm fw-medium text-slate-800">{{ req.hospital }}</div>
-            <div class="text-xs text-muted"><i class="fa-solid fa-location-dot text-primary"></i> {{ req.location }}</div>
-          </td>
-          <td>
-            <div class="d-flex align-center gap-2">
-              <span class="blood-badge blood-badge-sm">{{ req.bloodGroup }}</span>
-              <span class="text-sm fw-semibold text-slate-800">{{ req.component }}</span>
-            </div>
-          </td>
-          <td style="min-width: 160px;">
-            <div class="d-flex align-center justify-between text-xs mb-1">
-              <span>{{ req.unitsFulfilled }} of {{ req.unitsNeeded }} Units</span>
-              <span class="fw-bold">{{ ((req.unitsFulfilled / req.unitsNeeded) * 100) | round | int }}%</span>
-            </div>
-            <div class="inventory-bar-track">
-              <div class="inventory-bar-fill" style="width: {{ ((req.unitsFulfilled / req.unitsNeeded) * 100) | round | int }}%; background-color: var(--primary);"></div>
-            </div>
-          </td>
-          <td>
-            {% if req.urgency == 'critical' %}
-              <span class="urgency-chip urgency-critical"><i class="fa-solid fa-circle-radiation"></i> Critical SOS</span>
-            {% elif req.urgency == 'urgent' %}
-              <span class="urgency-chip urgency-urgent"><i class="fa-solid fa-clock"></i> Urgent</span>
-            {% else %}
-              <span class="urgency-chip urgency-routine">Routine</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if req.status == 'in-progress' %}
-              <span class="badge badge-info"><i class="fa-solid fa-spinner animate-spin"></i> In Progress</span>
-            {% elif req.status == 'matched' %}
-              <span class="badge badge-warning"><i class="fa-solid fa-user-check"></i> Matched</span>
-            {% elif req.status == 'fulfilled' %}
-              <span class="badge badge-success"><i class="fa-solid fa-check"></i> Fulfilled</span>
-            {% else %}
-              <span class="badge badge-slate">Pending</span>
-            {% endif %}
-          </td>
-          <td>
-            <div class="d-flex align-center gap-2">
-              <a href="/match?group={{ req.bloodGroup }}&component={{ req.component }}" class="btn btn-primary btn-sm">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Match
-              </a>
-              {% if req.urgency == 'critical' %}
-                <a href="/emergency" class="btn btn-emergency btn-sm" title="Launch SOS Broadcast">
-                  <i class="fa-solid fa-bullhorn"></i>
-                </a>
-              {% endif %}
-            </div>
+        <tr>
+          <td colspan="7" class="text-center py-4 text-muted">
+            <i class="fa-solid fa-spinner fa-spin me-2 text-primary"></i> Loading requests from clinical database...
           </td>
         </tr>
-        {% endfor %}
       </tbody>
     </table>
   </div>
@@ -110,15 +59,201 @@
 
 {% block extra_scripts %}
 <script>
-function filterRequests(type) {
+let allRequestsData = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadRealRequestsTable();
+});
+
+async function loadRealRequestsTable() {
+  const tbody = document.getElementById('requestsTableBody');
+  if (!tbody) return;
+
+  try {
+    const res = await HemoAPI.getPatientRequests();
+    if (res && res.success && Array.isArray(res.requests)) {
+      allRequestsData = res.requests;
+      updateFilterCounts(allRequestsData);
+      renderRequestsTable(allRequestsData);
+    } else {
+      throw new Error(res.error || 'Failed to fetch blood requests.');
+    }
+  } catch (err) {
+    console.error('Error loading patient requests:', err);
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center py-5">
+          <div class="empty-state">
+            <div class="empty-state-icon"><i class="fa-solid fa-file-circle-question text-muted"></i></div>
+            <div class="empty-state-title">No Requests Found</div>
+            <p class="empty-state-desc small text-muted">No patient blood requirements are currently active. Click below to create your first request.</p>
+            <a href="/requests/new" class="btn btn-primary btn-sm mt-2">
+              <i class="fa-solid fa-plus me-1"></i> Create Blood Request
+            </a>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function updateFilterCounts(requests) {
+  const countAll = document.getElementById('countAll');
+  const countCritical = document.getElementById('countCritical');
+  const countUrgent = document.getElementById('countUrgent');
+  const countRoutine = document.getElementById('countRoutine');
+  const countFulfilled = document.getElementById('countFulfilled');
+
+  if (countAll) countAll.textContent = requests.length;
+  if (countCritical) countCritical.textContent = requests.filter(r => (r.urgency || '').toUpperCase() === 'CRITICAL').length;
+  if (countUrgent) countUrgent.textContent = requests.filter(r => (r.urgency || '').toUpperCase() === 'URGENT').length;
+  if (countRoutine) countRoutine.textContent = requests.filter(r => (r.urgency || '').toUpperCase() === 'NORMAL' || (r.urgency || '').toLowerCase() === 'routine').length;
+  if (countFulfilled) countFulfilled.textContent = requests.filter(r => r.request_status === 'FULFILLED').length;
+}
+
+function renderRequestsTable(requests) {
+  const tbody = document.getElementById('requestsTableBody');
+  if (!tbody) return;
+
+  if (requests.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center py-5">
+          <div class="empty-state">
+            <div class="empty-state-icon"><i class="fa-solid fa-file-circle-plus text-primary"></i></div>
+            <div class="empty-state-title">No Active Blood Requirements</div>
+            <p class="empty-state-desc small text-muted">Submit an emergency or scheduled blood request to initiate smart donor matching.</p>
+            <a href="/requests/new" class="btn btn-primary btn-sm mt-2">
+              <i class="fa-solid fa-plus me-1"></i> Create Blood Request
+            </a>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = requests.map(req => {
+    const urgency = (req.urgency || 'NORMAL').toUpperCase();
+    const status = req.request_status || 'OPEN';
+    const totalSent = req.total_sent || 0;
+    const acceptedCount = req.accepted_count || 0;
+    const pendingCount = req.pending_count || 0;
+    const units = req.required_units || 1;
+
+    let urgencyChip = '<span class="urgency-chip urgency-routine">Routine</span>';
+    if (urgency === 'CRITICAL') {
+      urgencyChip = '<span class="urgency-chip urgency-critical"><i class="fa-solid fa-circle-radiation"></i> Critical SOS</span>';
+    } else if (urgency === 'URGENT') {
+      urgencyChip = '<span class="urgency-chip urgency-urgent"><i class="fa-solid fa-clock"></i> Urgent</span>';
+    }
+
+    let statusBadge = '<span class="badge badge-slate">Open</span>';
+    if (status === 'MATCHING') {
+      statusBadge = '<span class="badge badge-info"><i class="fa-solid fa-spinner fa-spin"></i> Matching</span>';
+    } else if (status === 'FULFILLED') {
+      statusBadge = '<span class="badge badge-success"><i class="fa-solid fa-check"></i> Fulfilled</span>';
+    } else if (status === 'CANCELLED') {
+      statusBadge = '<span class="badge badge-danger">Cancelled</span>';
+    }
+
+    const createdTimeStr = req.created_at ? new Date(req.created_at).toLocaleDateString() + ' ' + new Date(req.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Recent';
+
+    return `
+      <tr class="req-row" data-urgency="${urgency}" data-status="${status}">
+        <td>
+          <div class="fw-bold text-slate-900">Request #${req.id}</div>
+          <div class="text-xs text-muted text-mono">${createdTimeStr}</div>
+        </td>
+        <td>
+          <div class="text-sm fw-medium text-slate-800">${req.hospital_name || 'Hospital Facility'}</div>
+          <div class="text-xs text-muted"><i class="fa-solid fa-location-dot text-primary"></i> ${req.location || 'Kolkata'}</div>
+        </td>
+        <td>
+          <div class="d-flex align-center gap-2">
+            <span class="blood-badge blood-badge-sm">${req.required_blood_group}</span>
+            <span class="text-sm fw-semibold text-slate-800">${units} Unit${units === 1 ? '' : 's'}</span>
+          </div>
+        </td>
+        <td style="min-width: 160px;">
+          <div class="d-flex align-center justify-between text-xs mb-1">
+            <span><strong>${acceptedCount}</strong> accepted / ${totalSent} dispatched</span>
+            <span class="fw-bold">${totalSent > 0 ? Math.round((acceptedCount / totalSent) * 100) : 0}%</span>
+          </div>
+          <div class="inventory-bar-track">
+            <div class="inventory-bar-fill" style="width: ${totalSent > 0 ? Math.round((acceptedCount / totalSent) * 100) : 0}%; background-color: ${acceptedCount > 0 ? 'var(--teal)' : 'var(--primary)'};"></div>
+          </div>
+        </td>
+        <td>${urgencyChip}</td>
+        <td>${statusBadge}</td>
+        <td>
+          <div class="d-flex align-center gap-2">
+            <a href="/match?request_id=${req.id}&group=${encodeURIComponent(req.required_blood_group)}" class="btn btn-primary btn-sm" title="Open Matching Engine">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Match & Dispatch
+            </a>
+            ${status !== 'FULFILLED' && status !== 'CANCELLED' ? `
+              <button class="btn btn-outline-success btn-sm" title="Mark as Fulfilled" onclick="fulfillRequest(${req.id})">
+                <i class="fa-solid fa-check"></i>
+              </button>
+              <button class="btn btn-outline-danger btn-sm" title="Cancel Request" onclick="cancelRequest(${req.id})">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function fulfillRequest(reqId) {
+  if (!confirm(`Mark blood requirement #${reqId} as fulfilled?`)) return;
+  try {
+    const res = await HemoAPI.fulfillBloodRequest(reqId);
+    if (res && res.success) {
+      HemoUI.showToast('Request Fulfilled', `Blood request #${reqId} marked as fulfilled.`, 'success');
+      loadRealRequestsTable();
+    }
+  } catch (err) {
+    HemoUI.showToast('Action Failed', err.message, 'error');
+  }
+}
+
+async function cancelRequest(reqId) {
+  if (!confirm(`Are you sure you want to cancel blood request #${reqId}?`)) return;
+  try {
+    const res = await HemoAPI.cancelBloodRequest(reqId);
+    if (res && res.success) {
+      HemoUI.showToast('Request Cancelled', `Blood request #${reqId} has been cancelled.`, 'info');
+      loadRealRequestsTable();
+    }
+  } catch (err) {
+    HemoUI.showToast('Action Failed', err.message, 'error');
+  }
+}
+
+function filterRequests(filterType) {
+  // Update active tab styling
+  document.querySelectorAll('.nav-tab-item').forEach(tab => tab.classList.remove('active'));
+  if (filterType === 'all') document.getElementById('tabAll')?.classList.add('active');
+  if (filterType === 'CRITICAL') document.getElementById('tabCritical')?.classList.add('active');
+  if (filterType === 'URGENT') document.getElementById('tabUrgent')?.classList.add('active');
+  if (filterType === 'NORMAL') document.getElementById('tabRoutine')?.classList.add('active');
+  if (filterType === 'FULFILLED') document.getElementById('tabFulfilled')?.classList.add('active');
+
   const rows = document.querySelectorAll('.req-row');
   rows.forEach(r => {
-    if (type === 'all') {
+    const u = r.getAttribute('data-urgency');
+    const s = r.getAttribute('data-status');
+
+    if (filterType === 'all') {
       r.style.display = '';
-    } else if (type === 'fulfilled') {
-      r.style.display = r.getAttribute('data-status') === 'fulfilled' ? '' : 'none';
+    } else if (filterType === 'FULFILLED') {
+      r.style.display = s === 'FULFILLED' ? '' : 'none';
+    } else if (filterType === 'NORMAL') {
+      r.style.display = (u === 'NORMAL' || u === 'ROUTINE') ? '' : 'none';
     } else {
-      r.style.display = r.getAttribute('data-urgency') === type ? '' : 'none';
+      r.style.display = u === filterType ? '' : 'none';
     }
   });
 }

@@ -87,40 +87,52 @@
 
 <!-- Matching Results Container -->
 <div class="card">
-  <div class="card-header">
+  <div class="card-header d-flex align-center justify-between flex-wrap gap-2">
     <div>
       <div class="d-flex align-center gap-2">
-        <h3 class="card-title">Ranked Compatible Candidates</h3>
-        <span class="badge badge-success" id="matchFoundBadge">Computing...</span>
+        <h3 class="card-title" id="matchingTitleHeader">Ranked Compatible Candidates</h3>
+        <span class="badge badge-success" id="matchFoundBadge">Checking API...</span>
       </div>
-      <p class="card-subtitle">Sorted by composite algorithm score (Antigen 40%, Distance 30%, Cooldown 20%, Response 10%)</p>
+      <p class="card-subtitle" id="matchingSubtitleHeader">Multi-criteria ranking from clinical backend: Antigen Compatibility, Geo-Radius, Cooldown, and Response Rate</p>
     </div>
-    <button class="btn btn-outline-primary btn-sm" onclick="runMatchAlgorithm()">
-      <i class="fa-solid fa-rotate-right"></i> Recalculate
-    </button>
+    <div class="d-flex align-center gap-2">
+      <div id="requestSelectorWrap" class="d-none">
+        <select class="form-select form-select-sm" id="activeRequestSelect" onchange="switchActiveRequest(this.value)">
+          <!-- Populated if patient has multiple requests -->
+        </select>
+      </div>
+      <button class="btn btn-outline-primary btn-sm" onclick="runMatchAlgorithm()">
+        <i class="fa-solid fa-rotate-right"></i> Recalculate
+      </button>
+    </div>
   </div>
 
   <div class="card-body p-6" id="matchResultsContainer">
-    <!-- Populated by matching engine -->
+    <div class="text-center py-5">
+      <i class="fa-solid fa-spinner fa-spin text-primary fs-3 mb-2"></i>
+      <p class="text-muted small">Querying clinical database for compatible donors...</p>
+    </div>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  // Read URL params if any
+let currentRequestId = null;
+let currentRequestData = null;
+let alreadyContactedDonorIds = new Set();
+let cachedMatches = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
+  const reqIdParam = urlParams.get('request_id') || urlParams.get('id');
   const group = urlParams.get('group');
   const comp = urlParams.get('component');
   const city = urlParams.get('city');
 
   if (city && document.getElementById('matchCityLocation')) {
     document.getElementById('matchCityLocation').value = city;
-  } else if (document.getElementById('matchCityLocation')) {
-    document.getElementById('matchCityLocation').value = 'Kolkata';
   }
-
   if (group && document.getElementById('matchRecipientGroup')) {
     document.getElementById('matchRecipientGroup').value = group;
   }
@@ -128,55 +140,167 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('matchComponent').value = comp;
   }
 
-  runMatchAlgorithm();
+  if (reqIdParam) {
+    currentRequestId = parseInt(reqIdParam, 10);
+    await loadMatchesForRequest(currentRequestId);
+  } else {
+    // Check if patient has any existing requests
+    try {
+      const patientRequestsRes = await HemoAPI.getPatientRequests();
+      if (patientRequestsRes && patientRequestsRes.success && patientRequestsRes.requests && patientRequestsRes.requests.length > 0) {
+        const requests = patientRequestsRes.requests;
+        const activeRequests = requests.filter(r => r.request_status === 'OPEN' || r.request_status === 'MATCHING');
+        const reqToUse = activeRequests.length > 0 ? activeRequests[0] : requests[0];
+        currentRequestId = reqToUse.id;
+
+        // Render request selector dropdown
+        const selectWrap = document.getElementById('requestSelectorWrap');
+        const selectEl = document.getElementById('activeRequestSelect');
+        if (selectWrap && selectEl) {
+          selectEl.innerHTML = requests.map(r => `
+            <option value="${r.id}" ${r.id === currentRequestId ? 'selected' : ''}>
+              #REQ-${r.id}: ${r.required_blood_group} (${r.hospital_name}) - ${r.request_status}
+            </option>
+          `).join('');
+          selectWrap.classList.remove('d-none');
+        }
+
+        await loadMatchesForRequest(currentRequestId);
+      } else {
+        // No existing patient requests in database
+        renderNoRequestsState();
+      }
+    } catch (err) {
+      console.warn('Could not load patient requests:', err);
+      // Fallback for non-patient or unauthenticated visitors
+      renderNoRequestsState();
+    }
+  }
 });
 
-function runMatchAlgorithm() {
-  const recipientGroup = document.getElementById('matchRecipientGroup').value;
-  const component = document.getElementById('matchComponent').value;
-  const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
-  const maxDistanceKm = parseInt(document.getElementById('matchRadius').value);
-  const verifiedOnly = document.getElementById('matchVerifiedOnly').checked;
+async function switchActiveRequest(reqId) {
+  if (!reqId) return;
+  currentRequestId = parseInt(reqId, 10);
+  await loadMatchesForRequest(currentRequestId);
+}
 
-  const results = HemoMatcher.findMatches({
-    recipientGroup,
-    component,
-    maxDistanceKm
-  });
-
-  // Filter by selected city location if specific city selected
-  let filtered = results;
-  if (selectedCity && selectedCity !== 'All') {
-    const cityMatches = results.filter(r => r.donor.city && r.donor.city.toLowerCase() === selectedCity.toLowerCase());
-    // If exact city matches exist, use them; otherwise show all with location note
-    filtered = cityMatches.length > 0 ? cityMatches : results;
-  }
-
-  if (verifiedOnly) {
-    filtered = filtered.filter(r => r.donor.verified);
-  }
-
-  const badge = document.getElementById('matchFoundBadge');
-  if (badge) {
-    const cityText = selectedCity !== 'All' ? ` in ${selectedCity}` : '';
-    badge.textContent = `${filtered.length} Optimal Matches Found${cityText}`;
-  }
-
+async function loadMatchesForRequest(requestId) {
   const container = document.getElementById('matchResultsContainer');
+  const badge = document.getElementById('matchFoundBadge');
+  const titleHeader = document.getElementById('matchingTitleHeader');
+  const subtitleHeader = document.getElementById('matchingSubtitleHeader');
+
+  if (container) {
+    container.innerHTML = `
+      <div class="text-center py-5">
+        <i class="fa-solid fa-spinner fa-spin text-primary fs-3 mb-2"></i>
+        <p class="text-muted small">Running matching pipeline for Request #${requestId}...</p>
+      </div>
+    `;
+  }
+
+  try {
+    // 1. Fetch Request Details & previous responses
+    const reqDetailsRes = await HemoAPI.getRequestDetails(requestId).catch(() => null);
+    if (reqDetailsRes && reqDetailsRes.success && reqDetailsRes.request) {
+      currentRequestData = reqDetailsRes.request;
+      
+      // Track already contacted donors
+      alreadyContactedDonorIds.clear();
+      if (reqDetailsRes.responses && Array.isArray(reqDetailsRes.responses)) {
+        reqDetailsRes.responses.forEach(resp => {
+          if (resp.status !== 'CANCELLED') {
+            alreadyContactedDonorIds.add(resp.donor_id || resp.user_id);
+          }
+        });
+      }
+
+      // Update Form Parameters to match the real request
+      if (document.getElementById('matchRecipientGroup')) {
+        document.getElementById('matchRecipientGroup').value = currentRequestData.required_blood_group;
+      }
+      if (titleHeader) {
+        titleHeader.innerHTML = `Ranked Matches for Request #${currentRequestData.id} <span class="blood-badge blood-badge-sm ms-2">${currentRequestData.required_blood_group}</span>`;
+      }
+      if (subtitleHeader) {
+        subtitleHeader.textContent = `Hospital: ${currentRequestData.hospital_name} • Units: ${currentRequestData.required_units} • Urgency: ${currentRequestData.urgency} • Status: ${currentRequestData.request_status}`;
+      }
+    }
+
+    // 2. Fetch Matching Candidates from Backend API
+    const matchRes = await HemoAPI.getRequestMatches(requestId);
+    if (matchRes && matchRes.success && Array.isArray(matchRes.matches)) {
+      cachedMatches = matchRes.matches;
+      renderMatchedDonorsList(cachedMatches);
+    } else {
+      throw new Error(matchRes.error || 'Failed to retrieve donor matches.');
+    }
+  } catch (error) {
+    console.error('Error loading matching candidates:', error);
+    if (badge) {
+      badge.className = 'badge badge-danger';
+      badge.textContent = 'API Error';
+    }
+    if (container) {
+      container.innerHTML = `
+        <div class="alert alert-danger d-flex align-items-center p-3 rounded-3" role="alert">
+          <i class="fa-solid fa-circle-exclamation fs-4 me-3 text-danger flex-shrink-0"></i>
+          <div>
+            <h5 class="alert-heading fw-bold mb-1">Backend Matching Service Error</h5>
+            <p class="mb-2 text-sm">${error.message || 'Unable to communicate with the matching engine.'}</p>
+            <a href="/requests/new" class="btn btn-sm btn-outline-danger">Create New Request</a>
+          </div>
+        </div>
+      `;
+    }
+  }
+}
+
+function runMatchAlgorithm() {
+  if (currentRequestId) {
+    loadMatchesForRequest(currentRequestId);
+  } else {
+    // If no request is active, re-check or guide user
+    renderNoRequestsState();
+  }
+}
+
+function renderMatchedDonorsList(matches) {
+  const container = document.getElementById('matchResultsContainer');
+  const badge = document.getElementById('matchFoundBadge');
   if (!container) return;
+
+  const selectedCity = document.getElementById('matchCityLocation')?.value || 'All';
+  const verifiedOnly = document.getElementById('matchVerifiedOnly')?.checked || false;
+
+  // Apply visual-only UI filters
+  let filtered = matches;
+  if (selectedCity && selectedCity !== 'All') {
+    filtered = filtered.filter(m => (m.masked_location || m.location || '').toLowerCase().includes(selectedCity.toLowerCase()));
+  }
+  if (verifiedOnly) {
+    filtered = filtered.filter(m => m.profile_status === 'ACTIVE' || m.last_verified_date);
+  }
+
+  if (badge) {
+    badge.className = 'badge badge-success';
+    badge.textContent = `${filtered.length} Matched Candidate${filtered.length === 1 ? '' : 's'}`;
+  }
 
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-satellite-dish text-primary animate-pulse-sos"></i></div>
-        <div class="empty-state-title">No Compatible Donors Found in ${selectedCity}</div>
-        <p class="empty-state-desc">No registered eligible donors match the specified proximity limit in ${selectedCity}. Try selecting 'All Cities', expanding radius, or launching an emergency alert.</p>
-        <div class="d-flex align-center justify-center gap-2 flex-wrap">
-          <button class="btn btn-primary btn-sm" onclick="document.getElementById('matchCityLocation').value = 'All'; runMatchAlgorithm();">
-            <i class="fa-solid fa-earth-asia me-1"></i> Search All Cities
-          </button>
+      <div class="empty-state py-5 text-center">
+        <div class="empty-state-icon mb-3"><i class="fa-solid fa-satellite-dish text-primary fa-2x animate-pulse-sos"></i></div>
+        <h4 class="empty-state-title fw-bold text-slate-900">No Compatible Donors Found</h4>
+        <p class="empty-state-desc text-muted small mx-auto" style="max-width: 520px;">
+          No active verified donors matched the ABO/Rh compatibility criteria and distance thresholds in this region. Try increasing radius or broadcasting an emergency request.
+        </p>
+        <div class="d-flex align-center justify-center gap-2 mt-3">
+          <a href="/requests/new" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus me-1"></i> New Blood Requirement
+          </a>
           <a href="/emergency" class="btn btn-emergency btn-sm">
-            <i class="fa-solid fa-radiation me-1"></i> Launch Emergency Broadcast
+            <i class="fa-solid fa-radiation me-1"></i> Code-Red Broadcast
           </a>
         </div>
       </div>
@@ -185,42 +309,69 @@ function runMatchAlgorithm() {
   }
 
   container.innerHTML = filtered.map(item => {
+    const donorUserId = item.user_id || item.donor_id || item.id;
+    const isContacted = item.is_already_contacted || alreadyContactedDonorIds.has(donorUserId);
+    const donorName = item.full_name || item.name || 'Anonymous Donor';
+    const bloodGroup = item.blood_group || 'O+';
+    const matchScore = item.match_score || item.matching_score || 85;
+    const distanceKm = item.distance_km != null ? item.distance_km : (item.approximate_distance_km || 5.0);
+    const travelTime = item.estimated_travel_time || `${Math.round(distanceKm * 2.5 + 5)} mins`;
+    const locationStr = item.masked_location || item.location || 'Regional Zone';
+    const availabilityStr = item.availability_label || item.availability || '24 Hours';
+    const phone = item.phone || '+91 Contact through Portal';
+
     let scoreBadgeClass = 'match-score-high';
-    if (item.matchScore < 80) scoreBadgeClass = 'match-score-medium';
-    if (item.matchScore < 60) scoreBadgeClass = 'match-score-low';
+    if (matchScore < 80) scoreBadgeClass = 'match-score-medium';
+    if (matchScore < 60) scoreBadgeClass = 'match-score-low';
+
+    // Breakdown pills
+    const breakdown = item.score_breakdown || {};
+    const reasonPills = [];
+    if (item.match_reasons && Array.isArray(item.match_reasons)) {
+      item.match_reasons.forEach(r => reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-check text-success"></i> ${r}</span>`));
+    } else {
+      reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-dna text-primary"></i> ABO/Rh Compatible (${bloodGroup})</span>`);
+      reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-route text-teal"></i> Proximity: ~${distanceKm} km (ETA: ${travelTime})</span>`);
+      reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-clock text-info"></i> Schedule: ${availabilityStr}</span>`);
+    }
 
     return `
-      <div class="match-candidate-card animate-fade-in">
-        <div class="d-flex align-center gap-4 flex-1">
-          <div class="match-score-badge ${scoreBadgeClass}">
-            <div class="text-xl fw-extrabold">${item.matchScore}%</div>
-            <div class="text-xs" style="font-size: 0.65rem; text-transform: uppercase;">Match</div>
+      <div class="match-candidate-card animate-fade-in p-4 mb-3 border rounded-3 bg-white shadow-sm d-flex align-items-center justify-content-between flex-wrap gap-3" id="donorCard-${donorUserId}">
+        <div class="d-flex align-items-center gap-3 flex-1" style="min-width: 280px;">
+          <div class="match-score-badge ${scoreBadgeClass} text-center p-2 rounded-3" style="min-width: 68px;">
+            <div class="text-xl fw-extrabold lh-1">${matchScore}%</div>
+            <div class="text-xs text-uppercase mt-1" style="font-size: 0.62rem; letter-spacing: 0.04em;">Match</div>
           </div>
 
           <div class="flex-1">
-            <div class="d-flex align-center gap-2 mb-1 flex-wrap">
-              <span class="blood-badge blood-badge-sm">${item.donor.bloodGroup}</span>
-              <a href="/donors/${item.donor.id}" class="text-base fw-bold text-slate-900">${item.donor.name}</a>
-              ${item.donor.verified ? '<span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Verified</span>' : ''}
-              <span class="status-chip ${item.donor.status}">${item.donor.status}</span>
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+              <span class="blood-badge blood-badge-sm">${bloodGroup}</span>
+              <span class="text-base fw-bold text-slate-900">${donorName}</span>
+              <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> ${item.profile_status || 'Verified Active'}</span>
             </div>
 
             <div class="text-xs text-muted mb-2">
-              <i class="fa-solid fa-location-dot text-primary"></i> ${item.donor.area}, <strong>${item.donor.city || selectedCity}</strong> • ${item.donor.distanceKm} km away • ${item.donor.phone}
+              <i class="fa-solid fa-location-dot text-primary me-1"></i> ${locationStr} • <strong>${distanceKm} km away</strong> • ETA ~${travelTime}
             </div>
 
-            <div class="match-reasons-list">
-              ${item.reasons.map(r => `<span class="reason-chip"><i class="fa-solid fa-check text-success"></i> ${r}</span>`).join('')}
+            <div class="match-reasons-list d-flex flex-wrap gap-1">
+              ${reasonPills.join('')}
             </div>
           </div>
         </div>
 
-        <div class="d-flex flex-column gap-2" style="min-width: 140px;">
-          <button class="btn btn-primary btn-sm justify-center" onclick="dispatchDirectMatch('${item.donor.name}', '${item.donor.bloodGroup}')">
-            <i class="fa-solid fa-paper-plane"></i> Dispatch
-          </button>
-          <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${item.donor.name}', '${item.donor.bloodGroup}', '${item.donor.phone}', '${item.donor.area}, ${item.donor.city}')">
-            <i class="fa-solid fa-phone"></i> Contact
+        <div class="d-flex flex-column gap-2" style="min-width: 160px;">
+          ${isContacted ? `
+            <button class="btn btn-secondary btn-sm justify-center" disabled>
+              <i class="fa-solid fa-clock-rotate-left me-1"></i> Dispatched (Pending)
+            </button>
+          ` : `
+            <button class="btn btn-primary btn-sm justify-center" id="btnDispatch-${donorUserId}" onclick="dispatchDonorRequest(${currentRequestId}, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}')">
+              <i class="fa-solid fa-paper-plane me-1"></i> Send Request
+            </button>
+          `}
+          <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${donorName.replace(/'/g, "\\'")}', '${bloodGroup}', '${phone}', '${locationStr.replace(/'/g, "\\'")}')">
+            <i class="fa-solid fa-phone me-1"></i> Contact Donor
           </button>
         </div>
       </div>
@@ -228,12 +379,82 @@ function runMatchAlgorithm() {
   }).join('');
 }
 
-function dispatchDirectMatch(donorName, bloodGroup) {
-  HemoUI.showToast(
-    'Donor Dispatched',
-    `Dispatch request sent to ${donorName} (${bloodGroup}). Hospital triage informed.`,
-    'success'
-  );
+async function dispatchDonorRequest(requestId, donorId, donorName) {
+  if (!requestId || !donorId) {
+    HemoUI.showToast('Dispatch Notice', 'Valid request ID and donor ID are required.', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById(`btnDispatch-${donorId}`);
+  const originalHtml = btn ? btn.innerHTML : '';
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Dispatching...';
+    }
+
+    const response = await HemoAPI.sendDonorRequest(requestId, donorId);
+
+    if (response && response.success) {
+      alreadyContactedDonorIds.add(donorId);
+      if (btn) {
+        btn.className = 'btn btn-success btn-sm justify-center';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Dispatched (Pending)';
+      }
+
+      HemoUI.showToast(
+        'Donation Request Dispatched',
+        response.message || `Request sent to ${donorName}. Status: PENDING response.`,
+        'success'
+      );
+    } else {
+      throw new Error(response.error || 'Failed to dispatch request.');
+    }
+  } catch (error) {
+    console.error('Error dispatching donor request:', error);
+    if (btn) {
+      if (error.status === 409) {
+        btn.className = 'btn btn-secondary btn-sm justify-center';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i> Already Sent';
+        HemoUI.showToast('Already Dispatched', error.message, 'warning');
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        HemoUI.showToast('Dispatch Failed', error.message || 'Could not dispatch to donor.', 'error');
+      }
+    }
+  }
+}
+
+function renderNoRequestsState() {
+  const container = document.getElementById('matchResultsContainer');
+  const badge = document.getElementById('matchFoundBadge');
+  if (badge) {
+    badge.className = 'badge badge-slate';
+    badge.textContent = 'No Active Request';
+  }
+  if (container) {
+    container.innerHTML = `
+      <div class="empty-state py-5 text-center">
+        <div class="empty-state-icon mb-3"><i class="fa-solid fa-notes-medical text-primary fa-2x"></i></div>
+        <h4 class="empty-state-title fw-bold text-slate-900">No Active Blood Requirement Selected</h4>
+        <p class="empty-state-desc text-muted small mx-auto" style="max-width: 520px;">
+          To find and dispatch compatible donors, please create a blood requirement request first or select one from your dashboard.
+        </p>
+        <div class="d-flex align-center justify-center gap-2 mt-3">
+          <a href="/requests/new" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus me-1"></i> Create Blood Request
+          </a>
+          <a href="/requests" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-list me-1"></i> View All Requests
+          </a>
+        </div>
+      </div>
+    `;
+  }
 }
 </script>
 {% endblock %}

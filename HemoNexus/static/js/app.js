@@ -694,3 +694,75 @@ const HemoUI = (() => {
     triggerMatchingSearchAnimation
   };
 })();
+
+/**
+ * HemoNexus Unified Backend REST API Client
+ * Connects frontend flows to real Flask endpoints with credentials: 'include'
+ */
+const HemoAPI = (() => {
+  const apiFetch = async (url, options = {}) => {
+    const config = {
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        ...(options.headers || {})
+      },
+      ...options
+    };
+
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+      config.body = JSON.stringify(options.body);
+    }
+
+    try {
+      const res = await fetch(url, config);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errorMsg = data.error || data.message || `Request failed with status ${res.status}`;
+        const error = new Error(errorMsg);
+        error.status = res.status;
+        error.data = data;
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      console.error(`[HemoAPI] Error requesting ${url}:`, err);
+      throw err;
+    }
+  };
+
+  return {
+    // 1. Patient Blood Requests
+    createBloodRequest: (payload) => apiFetch('/api/patient/blood-requests', { method: 'POST', body: payload }),
+    getPatientRequests: () => apiFetch('/api/patient/blood-requests', { method: 'GET' }),
+    getRequestDetails: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}`, { method: 'GET' }),
+    cancelBloodRequest: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/cancel`, { method: 'POST' }),
+    fulfillBloodRequest: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/fulfill`, { method: 'POST' }),
+
+    // 2. Smart Matching Candidates (Real Backend Heuristic Engine)
+    getRequestMatches: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/matches`, { method: 'GET' }),
+
+    // 3. Donor Dispatch / Send Request (Priority Endpoint)
+    sendDonorRequest: (requestId, donorId) => apiFetch(`/api/patient/blood-requests/${requestId}/send-request`, {
+      method: 'POST',
+      body: { donor_id: donorId }
+    }),
+
+    // 4. Donor Inbox & Action Responses
+    getDonorRequests: () => apiFetch('/api/donor/requests', { method: 'GET' }),
+    acceptDonorRequest: (responseId, message) => apiFetch(`/api/donor/requests/${responseId}/accept`, {
+      method: 'POST',
+      body: { message }
+    }),
+    rejectDonorRequest: (responseId, message) => apiFetch(`/api/donor/requests/${responseId}/reject`, {
+      method: 'POST',
+      body: { message }
+    }),
+
+    // 5. User / Identity
+    getCurrentUser: () => apiFetch('/api/me', { method: 'GET' }),
+    getPatientProfile: () => apiFetch('/api/patient/profile', { method: 'GET' }),
+    getDonorProfile: () => apiFetch('/api/donor/profile', { method: 'GET' })
+  };
+})();
