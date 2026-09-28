@@ -31,13 +31,24 @@
       <span class="bell-badge position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
     </button>
 
-    <!-- User Profile Dropdown -->
-    <div class="header-user d-flex align-center gap-2 p-1 rounded-lg border bg-white cursor-pointer" onclick="HemoUI.showToast('HemoNexus Staff', 'Signed in as Dr. Aditi Rao (Blood Bank Coordinator)', 'info')">
-      <div class="user-avatar" style="width: 2rem; height: 2rem; font-size: 0.75rem;">AR</div>
+    <!-- User Profile Dropdown / Sign In -->
+    {% if session.get('user_name') %}
+    <div class="header-user d-flex align-center gap-2 p-1 rounded-lg border bg-white cursor-pointer" onclick="HemoUI.showToast('Signed In Account', 'Active: {{ session.get('user_name') }} ({{ session.get('role', 'user').capitalize() }})', 'info')">
+      <div class="user-avatar" style="width: 2rem; height: 2rem; font-size: 0.75rem; background: var(--crimson); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+        {{ session.get('user_name')[:2].upper() }}
+      </div>
       <div class="user-info d-none d-sm-block text-start">
-        <div class="user-name fw-bold text-xs text-ink lh-1">Dr. Aditi Rao</div>
-        <div class="user-role text-muted" style="font-size: 0.65rem;">Blood Bank Lead</div>
+        <div class="user-name fw-bold text-xs text-ink lh-1">{{ session.get('user_name') }}</div>
+        <div class="user-role text-muted text-capitalize" style="font-size: 0.65rem;">{{ session.get('role', 'user') }}</div>
       </div>
     </div>
+    <a href="/logout" class="btn btn-outline-danger btn-sm" title="Sign Out">
+      <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sign Out
+    </a>
+    {% else %}
+    <a href="/login" class="btn btn-primary btn-sm">
+      <i class="fa-solid fa-user-lock me-1"></i> Sign In
+    </a>
+    {% endif %}
   </div>
 </header>

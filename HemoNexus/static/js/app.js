@@ -100,28 +100,30 @@ const HemoAuth = (() => {
   };
 
   const handleLoginSubmit = (event) => {
+    const emailInput = document.getElementById('loginEmail');
+    const passInput = document.getElementById('loginPassword');
+    if (emailInput && !emailInput.value.trim()) return;
+    if (passInput && !passInput.value) return;
+
     const btn = document.getElementById('loginSubmitBtn');
     if (btn) {
       btn.innerHTML = `
         <span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>
-        <span>Authenticating Security Credentials...</span>
+        <span>Verifying Security Credentials...</span>
       `;
-      setTimeout(() => {
-        btn.disabled = true;
-      }, 50);
     }
   };
 
   const handleRegSubmit = (event) => {
+    const form = document.getElementById('authRegisterForm');
+    if (form && !form.checkValidity()) return;
+
     const btn = document.getElementById('registerSubmitBtn');
     if (btn) {
       btn.innerHTML = `
         <span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>
         <span>Registering Verified Profile...</span>
       `;
-      setTimeout(() => {
-        btn.disabled = true;
-      }, 50);
     }
   };
 

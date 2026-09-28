@@ -125,6 +125,25 @@
 
       <!-- Form (Stagger 3 & 4) -->
       <div class="card-body px-4 pt-2 pb-4">
+
+        {% if error %}
+        <div class="alert alert-danger d-flex align-items-center mb-3 py-2 px-3 rounded-3" role="alert" style="font-size: 0.85rem; border-left: 4px solid #dc3545;">
+          <i class="fa-solid fa-circle-exclamation me-2 fs-5 flex-shrink-0 text-danger"></i>
+          <div><strong>Registration Error:</strong> {{ error }}</div>
+        </div>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'success' if category == 'success' else ('danger' if category in ('error', 'danger') else ('warning' if category == 'warning' else 'info')) }} d-flex align-items-center mb-3 py-2 px-3 rounded-3" role="alert" style="font-size: 0.85rem;">
+                <i class="fa-solid {{ 'fa-circle-check text-success' if category == 'success' else 'fa-circle-info text-info' }} me-2 fs-5 flex-shrink-0"></i>
+                <div>{{ message }}</div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
         <form action="/register" method="POST" id="authRegisterForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleRegSubmit(event)">
           <input type="hidden" name="userRole" id="regRoleInput" value="{{ active_role or 'donor' }}">
 

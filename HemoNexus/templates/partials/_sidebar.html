@@ -83,10 +83,17 @@
           </a>
         </li>
         <li>
-          <a href="/login" class="sidebar-link">
+          {% if session.get('user_name') %}
+          <a href="/logout" class="sidebar-link text-danger">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            <span>Authentication / Login</span>
+            <span>Sign Out ({{ session.get('user_name') }})</span>
           </a>
+          {% else %}
+          <a href="/login" class="sidebar-link">
+            <i class="fa-solid fa-user-lock"></i>
+            <span>Authentication / Sign In</span>
+          </a>
+          {% endif %}
         </li>
       </ul>
     </div>

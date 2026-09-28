@@ -130,24 +130,36 @@ def create_user(full_name, email, password, role="donor", phone=None, db=None):
 def get_user_by_id(user_id, db=None):
     """Fetches user by primary key ID."""
     conn = db or get_db()
-    return query_db(
-        "SELECT id, user_id, full_name, name, email, phone, password_hash, role, created_at, updated_at FROM users WHERE id = ?",
+    user = query_db(
+        "SELECT * FROM users WHERE id = ?",
         (user_id,),
         one=True,
         db=conn
     )
+    if user and "user_id" not in user:
+        user_dict = dict(user)
+        user_dict["user_id"] = user_dict["id"]
+        user_dict["name"] = user_dict.get("full_name")
+        return user_dict
+    return user
 
 def get_user_by_email(email, db=None):
     """Fetches user by unique email."""
     conn = db or get_db()
     if not email:
         return None
-    return query_db(
-        "SELECT id, user_id, full_name, name, email, phone, password_hash, role, created_at, updated_at FROM users WHERE email = ?",
+    user = query_db(
+        "SELECT * FROM users WHERE email = ?",
         (email.strip().lower(),),
         one=True,
         db=conn
     )
+    if user and "user_id" not in user:
+        user_dict = dict(user)
+        user_dict["user_id"] = user_dict["id"]
+        user_dict["name"] = user_dict.get("full_name")
+        return user_dict
+    return user
 
 def authenticate_user(email, password, db=None):
     """Verifies user credentials and returns user record if valid."""

@@ -322,7 +322,25 @@
         <!-- Card Body / Form -->
         <div class="card-body px-4 pt-2 pb-4">
 
-          <form action="/login" method="POST" id="authLoginForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleLoginSubmit(event)" novalidate>
+          {% if error %}
+          <div class="alert alert-danger d-flex align-items-center mb-3 py-2 px-3 rounded-3" role="alert" style="font-size: 0.85rem; border-left: 4px solid #dc3545;">
+            <i class="fa-solid fa-circle-exclamation me-2 fs-5 flex-shrink-0 text-danger"></i>
+            <div><strong>Authentication Failed:</strong> {{ error }}</div>
+          </div>
+          {% endif %}
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else ('danger' if category in ('error', 'danger') else ('warning' if category == 'warning' else 'info')) }} d-flex align-items-center mb-3 py-2 px-3 rounded-3" role="alert" style="font-size: 0.85rem;">
+                  <i class="fa-solid {{ 'fa-circle-check text-success' if category == 'success' else ('fa-triangle-exclamation text-warning' if category == 'warning' else 'fa-circle-info text-info') }} me-2 fs-5 flex-shrink-0"></i>
+                  <div>{{ message }}</div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <form action="/login" method="POST" id="authLoginForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleLoginSubmit(event)">
             <input type="hidden" name="userRole" id="authRoleInput" value="{{ active_role or 'donor' }}">
 
             <!-- Email -->
@@ -330,8 +348,8 @@
               <label for="loginEmail" class="form-label small fw-semibold">Email Address or Mobile Number *</label>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
-                <input type="text" class="form-control border-start-0 ps-0" id="loginEmail" name="email"
-                       placeholder="name@example.com" value="aarav.sharma@example.com"
+                <input type="email" class="form-control border-start-0 ps-0" id="loginEmail" name="email"
+                       placeholder="e.g. amitav.donor@example.com" value="{{ email or '' }}"
                        autocomplete="email" required>
               </div>
             </div>
@@ -347,7 +365,7 @@
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
                 <input type="password" class="form-control border-start-0 border-end-0 ps-0"
                        id="loginPassword" name="password"
-                       placeholder="Enter security password" value="••••••••••••"
+                       placeholder="Enter your security password" value=""
                        autocomplete="current-password" required>
                 <button class="btn btn-outline-secondary border-start-0 text-muted"
                         type="button" id="togglePasswordBtn"
@@ -384,21 +402,39 @@
             </div>
 
             <!-- Remember Me -->
-            <div class="d-flex align-center justify-between mb-4 small">
+            <div class="d-flex align-center justify-between mb-3 small">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="rememberMeCheck" checked>
                 <label class="form-check-label text-muted" for="rememberMeCheck">Keep me signed in</label>
               </div>
-              <span class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> 256-bit SSL</span>
+              <span class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> PBKDF2 Hashed</span>
             </div>
 
             <!-- Submit -->
             <button type="submit"
-                    class="btn btn-primary w-100 btn-lg d-flex align-center justify-center gap-2"
+                    class="btn btn-primary w-100 btn-lg d-flex align-center justify-center gap-2 mb-3"
                     id="loginSubmitBtn">
-              <span>Continue to HemoNexus Home</span>
+              <span>Sign In to HemoNexus</span>
               <i class="fa-solid fa-arrow-right"></i>
             </button>
+
+            <!-- Verified Demo Accounts Quick Reference -->
+            <div class="p-2 rounded bg-light border text-start" style="font-size: 0.76rem; color: #495057;">
+              <div class="fw-bold mb-1 text-ink"><i class="fa-solid fa-database text-primary me-1"></i> Connected SQLite Database Accounts:</div>
+              <div class="d-flex justify-content-between mb-1">
+                <span><strong>Donor:</strong> <code>amitav.donor@example.com</code></span>
+                <span>Pass: <code>Donor@1234</code></span>
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <span><strong>Patient:</strong> <code>patient.raj@example.com</code></span>
+                <span>Pass: <code>Patient@1234</code></span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span><strong>Admin:</strong> <code>admin@hemonexus.org</code></span>
+                <span>Pass: <code>Admin@123456</code></span>
+              </div>
+            </div>
+
           </form>
 
         </div>

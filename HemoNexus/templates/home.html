@@ -31,6 +31,19 @@
       </ul>
 
       <div class="d-flex align-center gap-2">
+        {% if session.get('user_name') %}
+        <div class="d-flex align-center gap-2 px-2 py-1 rounded bg-light border text-xs d-none d-md-flex">
+          <span class="badge badge-teal text-uppercase"><i class="fa-solid fa-user-check me-1"></i>{{ session.get('role', 'user') }}</span>
+          <span class="fw-bold text-ink">{{ session.get('user_name') }}</span>
+        </div>
+        <a href="/logout" class="btn btn-outline-danger btn-sm" title="Sign Out">
+          <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sign Out
+        </a>
+        {% else %}
+        <a href="/login" class="btn btn-outline btn-sm">
+          <i class="fa-solid fa-user-lock me-1"></i> Sign In
+        </a>
+        {% endif %}
         <a href="/dashboard" class="btn btn-outline btn-sm">
           <i class="fa-solid fa-chart-pie me-1"></i> Operations Dashboard
         </a>
@@ -41,6 +54,20 @@
     </nav>
   </div>
 </header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="container mt-3">
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'success' if category == 'success' else ('danger' if category in ('error', 'danger') else ('warning' if category == 'warning' else 'info')) }} alert-dismissible fade show d-flex align-items-center mb-2 py-2 px-3 rounded-3 shadow-sm" role="alert" style="font-size: 0.9rem;">
+        <i class="fa-solid {{ 'fa-circle-check text-success' if category == 'success' else 'fa-circle-info text-info' }} me-2 fs-5 flex-shrink-0"></i>
+        <div class="flex-grow-1">{{ message }}</div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.75rem;"></button>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
 
 <!-- Hero Section (Staggered Entrance Animations on Page Load) -->
 <section class="hero-section">
