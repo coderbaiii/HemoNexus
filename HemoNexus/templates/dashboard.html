@@ -117,7 +117,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="dashboardRequestsBody">
               {% for req in requests %}
               <tr>
                 <td>
@@ -215,18 +215,9 @@
         </div>
         <div class="card-body p-4">
           <ul class="activity-feed-list" id="dashboardActivityList">
-            {% for act in activities %}
-            <li class="activity-item">
-              <div class="activity-icon {{ act.iconClass }}">
-                <i class="fa-solid {{ act.icon }}"></i>
-              </div>
-              <div>
-                <div class="activity-title">{{ act.title }}</div>
-                <p class="text-xs text-slate-600 mb-1">{{ act.desc }}</p>
-                <span class="activity-meta"><i class="fa-regular fa-clock"></i> {{ act.time }}</span>
-              </div>
+            <li class="p-4 text-center text-muted" id="activityLoadingState">
+              <i class="fa-solid fa-spinner fa-spin me-2 text-primary"></i> Syncing live activity feed...
             </li>
-            {% endfor %}
           </ul>
         </div>
       </div>
