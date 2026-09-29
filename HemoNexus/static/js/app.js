@@ -763,6 +763,10 @@ const HemoAPI = (() => {
     // 5. User / Identity
     getCurrentUser: () => apiFetch('/api/me', { method: 'GET' }),
     getPatientProfile: () => apiFetch('/api/patient/profile', { method: 'GET' }),
-    getDonorProfile: () => apiFetch('/api/donor/profile', { method: 'GET' })
+    getDonorProfile: () => apiFetch('/api/donor/profile', { method: 'GET' }),
+
+    // 6. Admin Endpoints
+    getAdminStats: () => apiFetch('/api/admin/stats', { method: 'GET' }),
+    getAdminRequests: () => apiFetch('/api/admin/blood-requests', { method: 'GET' })
   };
 })();
