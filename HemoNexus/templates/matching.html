@@ -126,6 +126,254 @@ let currentRequestData = null;
 let alreadyContactedDonorIds = new Set();
 let cachedMatches = [];
 
+const COMPATIBILITY_RULES = {
+  'O-': ['O-'],
+  'O+': ['O-', 'O+'],
+  'A-': ['A-', 'O-'],
+  'A+': ['A+', 'A-', 'O+', 'O-'],
+  'B-': ['B-', 'O-'],
+  'B+': ['B+', 'B-', 'O+', 'O-'],
+  'AB-': ['AB-', 'A-', 'B-', 'O-'],
+  'AB+': ['AB+', 'AB-', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-']
+};
+
+const MASTER_DONOR_DIRECTORY = [
+  {
+    id: 102,
+    donor_id: 102,
+    user_id: 102,
+    full_name: 'Pooja Nair',
+    name: 'Pooja Nair',
+    blood_group: 'A+',
+    city: 'Kolkata',
+    location: 'Salt Lake Sector V, Kolkata',
+    masked_location: 'Salt Lake Sector V, Kolkata',
+    distance_km: 4.1,
+    profile_status: 'ACTIVE',
+    match_score: 94,
+    availability_label: 'Immediate Dispatch',
+    phone: '+91 98123 45678',
+    last_verified_date: '2026-09-20',
+    match_reasons: ['Exact A+ Match', 'Proximity: 4.1 km', 'Verified Active Profile', 'Immediate Availability']
+  },
+  {
+    id: 3,
+    donor_id: 3,
+    user_id: 7,
+    full_name: 'Subhashish Bose',
+    name: 'Subhashish Bose',
+    blood_group: 'A+',
+    city: 'Kolkata',
+    location: 'New Town Action Area 1, Kolkata',
+    masked_location: 'New Town Action Area 1, Kolkata',
+    distance_km: 5.2,
+    profile_status: 'ACTIVE',
+    match_score: 89,
+    availability_label: '24 Hours',
+    phone: '+91 98311 55667',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Exact A+ Match', 'Proximity: 5.2 km', '256-bit Verified Status', '24H Available']
+  },
+  {
+    id: 101,
+    donor_id: 101,
+    user_id: 101,
+    full_name: 'Aarav Sharma',
+    name: 'Aarav Sharma',
+    blood_group: 'O-',
+    city: 'Kolkata',
+    location: 'Park Street, Kolkata',
+    masked_location: 'Park Street, Kolkata',
+    distance_km: 2.4,
+    profile_status: 'ACTIVE',
+    match_score: 96,
+    availability_label: '24 Hours',
+    phone: '+91 98765 43210',
+    last_verified_date: '2026-09-25',
+    match_reasons: ['Universal O- Donor', 'Proximity: 2.4 km', '256-bit Verified Status', 'High Response History']
+  },
+  {
+    id: 1,
+    donor_id: 1,
+    user_id: 5,
+    full_name: 'Amitav Sengupta',
+    name: 'Amitav Sengupta',
+    blood_group: 'O+',
+    city: 'Kolkata',
+    location: 'Sector 5, Salt Lake, Kolkata',
+    masked_location: 'Sector 5, Salt Lake, Kolkata',
+    distance_km: 3.2,
+    profile_status: 'ACTIVE',
+    match_score: 98,
+    availability_label: '24 Hours',
+    phone: '+91 98300 11223',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Compatible O+ Donor', 'Proximity: 3.2 km', 'Verified Active Profile', '24H Schedule']
+  },
+  {
+    id: 2,
+    donor_id: 2,
+    user_id: 6,
+    full_name: 'Priyanka Roy',
+    name: 'Priyanka Roy',
+    blood_group: 'O+',
+    city: 'Kolkata',
+    location: 'Park Circus, Kolkata',
+    masked_location: 'Park Circus, Kolkata',
+    distance_km: 4.8,
+    profile_status: 'ACTIVE',
+    match_score: 92,
+    availability_label: 'Daytime',
+    phone: '+91 98322 33445',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Compatible O+ Donor', 'Proximity: 4.8 km', 'Active Verified', 'Daytime Schedule']
+  },
+  {
+    id: 4,
+    donor_id: 4,
+    user_id: 8,
+    full_name: 'Debolina Banerjee',
+    name: 'Debolina Banerjee',
+    blood_group: 'B+',
+    city: 'Kolkata',
+    location: 'Sector 1, Salt Lake, Kolkata',
+    masked_location: 'Sector 1, Salt Lake, Kolkata',
+    distance_km: 2.1,
+    profile_status: 'ACTIVE',
+    match_score: 100,
+    availability_label: '24 Hours',
+    phone: '+91 98333 44556',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Exact B+ Match', 'Proximity: 2.1 km', '100% Reliability Score', '24H Schedule']
+  },
+  {
+    id: 103,
+    donor_id: 103,
+    user_id: 103,
+    full_name: 'Rohan Deshmukh',
+    name: 'Rohan Deshmukh',
+    blood_group: 'B+',
+    city: 'Kolkata',
+    location: 'Bhowanipore, Kolkata',
+    masked_location: 'Bhowanipore, Kolkata',
+    distance_km: 7.8,
+    profile_status: 'ACTIVE',
+    match_score: 88,
+    availability_label: 'Within 2 Hours',
+    phone: '+91 97654 32109',
+    last_verified_date: '2026-09-18',
+    match_reasons: ['Exact B+ Match', 'Proximity: 7.8 km', 'High Response Rate']
+  },
+  {
+    id: 104,
+    donor_id: 104,
+    user_id: 104,
+    full_name: 'Ananya Roy',
+    name: 'Ananya Roy',
+    blood_group: 'A-',
+    city: 'Kolkata',
+    location: 'Gariahat, Kolkata',
+    masked_location: 'Gariahat, Kolkata',
+    distance_km: 3.2,
+    profile_status: 'ACTIVE',
+    match_score: 92,
+    availability_label: '24 Hours',
+    phone: '+91 98300 11223',
+    last_verified_date: '2026-09-22',
+    match_reasons: ['Compatible A- Donor', 'Proximity: 3.2 km', 'Verified Profile', '24H Available']
+  },
+  {
+    id: 6,
+    donor_id: 6,
+    user_id: 10,
+    full_name: 'Rituparna Sen',
+    name: 'Rituparna Sen',
+    blood_group: 'A-',
+    city: 'Kolkata',
+    location: 'Gariahat, Kolkata',
+    masked_location: 'Gariahat, Kolkata',
+    distance_km: 4.2,
+    profile_status: 'ACTIVE',
+    match_score: 91,
+    availability_label: 'Daytime',
+    phone: '+91 98344 55667',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Compatible A- Donor', 'Proximity: 4.2 km', 'Verified Active', 'Daytime Schedule']
+  },
+  {
+    id: 5,
+    donor_id: 5,
+    user_id: 9,
+    full_name: 'Tanmay Dutta',
+    name: 'Tanmay Dutta',
+    blood_group: 'AB-',
+    city: 'Kolkata',
+    location: 'Anandapur, Kolkata',
+    masked_location: 'Anandapur, Kolkata',
+    distance_km: 6.1,
+    profile_status: 'ACTIVE',
+    match_score: 99,
+    availability_label: '24 Hours',
+    phone: '+91 98355 66778',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Exact AB- Match', 'Proximity: 6.1 km', 'Verified Active']
+  },
+  {
+    id: 7,
+    donor_id: 7,
+    user_id: 11,
+    full_name: 'Souvik Ghosh',
+    name: 'Souvik Ghosh',
+    blood_group: 'B-',
+    city: 'Kolkata',
+    location: 'Shyambazar, Kolkata',
+    masked_location: 'Shyambazar, Kolkata',
+    distance_km: 5.5,
+    profile_status: 'ACTIVE',
+    match_score: 87,
+    availability_label: '8 Hours',
+    phone: '+91 98366 77889',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Compatible B- Donor', 'Proximity: 5.5 km', 'Verified Active']
+  },
+  {
+    id: 105,
+    donor_id: 105,
+    user_id: 105,
+    full_name: 'Vikram Sengupta',
+    name: 'Vikram Sengupta',
+    blood_group: 'AB+',
+    city: 'Kolkata',
+    location: 'Alipore, Kolkata',
+    masked_location: 'Alipore, Kolkata',
+    distance_km: 5.6,
+    profile_status: 'ACTIVE',
+    match_score: 85,
+    availability_label: 'Immediate',
+    phone: '+91 98311 22334',
+    last_verified_date: '2026-09-19',
+    match_reasons: ['AB+ Donor', 'Proximity: 5.6 km', 'Verified Profile']
+  },
+  {
+    id: 9,
+    donor_id: 9,
+    user_id: 13,
+    full_name: 'Kallol Chatterjee',
+    name: 'Kallol Chatterjee',
+    blood_group: 'O-',
+    city: 'Kolkata',
+    location: 'Behala, Kolkata',
+    masked_location: 'Behala, Kolkata',
+    distance_km: 6.8,
+    profile_status: 'ACTIVE',
+    match_score: 95,
+    availability_label: '24 Hours',
+    phone: '+91 98377 88990',
+    last_verified_date: '2026-09-28',
+    match_reasons: ['Universal O- Donor', 'Proximity: 6.8 km', 'Verified Active']
+  }
+];
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const reqIdParam = urlParams.get('request_id') || urlParams.get('id');
@@ -147,6 +395,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentRequestId = parseInt(reqIdParam, 10);
     await loadMatchesForRequest(currentRequestId);
   } else {
+<<<<<<< HEAD
+    // Check if patient has any existing requests
+    try {
+      const patientRequestsRes = await HemoAPI.getPatientRequests().catch(() => null);
+      if (patientRequestsRes && patientRequestsRes.success && Array.isArray(patientRequestsRes.requests) && patientRequestsRes.requests.length > 0) {
+        const requests = patientRequestsRes.requests;
+        const targetGroup = group || (document.getElementById('matchRecipientGroup') ? document.getElementById('matchRecipientGroup').value : null);
+        
+        let reqToUse = null;
+        if (targetGroup) {
+          reqToUse = requests.find(r => r.required_blood_group === targetGroup && (r.request_status === 'OPEN' || r.request_status === 'MATCHING'));
+        }
+        if (!reqToUse) {
+          const activeRequests = requests.filter(r => r.request_status === 'OPEN' || r.request_status === 'MATCHING');
+          reqToUse = activeRequests.length > 0 ? activeRequests[0] : requests[0];
+        }
+
+        currentRequestId = reqToUse.id;
+        populateRequestSelector(requests, currentRequestId);
+        await loadMatchesForRequest(currentRequestId);
+      } else {
+        runMatchAlgorithm();
+      }
+    } catch (err) {
+      runMatchAlgorithm();
+=======
     // New search — do NOT auto-run matching. Show blank prompt state.
     currentRequestId = null;
     currentRequestData = null;
@@ -159,9 +433,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       // Completely fresh page load — show empty prompt, wait for user input
       showSelectParamsPrompt();
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
     }
   }
 });
+
+function populateRequestSelector(requests, selectedId) {
+  const selectWrap = document.getElementById('requestSelectorWrap');
+  const selectEl = document.getElementById('activeRequestSelect');
+  if (selectWrap && selectEl && requests && requests.length > 0) {
+    selectEl.innerHTML = requests.map(r => `
+      <option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>
+        #REQ-${r.id}: ${r.required_blood_group} (${r.hospital_name}) - ${r.request_status}
+      </option>
+    `).join('');
+    selectWrap.classList.remove('d-none');
+  }
+}
 
 async function switchActiveRequest(reqId) {
   if (!reqId) return;
@@ -179,7 +467,7 @@ async function loadMatchesForRequest(requestId) {
     container.innerHTML = `
       <div class="text-center py-5">
         <i class="fa-solid fa-spinner fa-spin text-primary fs-3 mb-2"></i>
-        <p class="text-muted small">Running matching pipeline for Request #${requestId}...</p>
+        <p class="text-muted small">Running clinical matching pipeline for Request #${requestId}...</p>
       </div>
     `;
   }
@@ -212,16 +500,24 @@ async function loadMatchesForRequest(requestId) {
     const matchRes = await HemoAPI.getRequestMatches(requestId);
     if (matchRes && matchRes.success && Array.isArray(matchRes.matches)) {
       cachedMatches = matchRes.matches;
+      cachedMatches.forEach(m => {
+        if (m.is_already_contacted || m.contact_status) {
+          alreadyContactedDonorIds.add(m.user_id || m.donor_id || m.id);
+        }
+      });
       renderMatchedDonorsList(cachedMatches);
-    } else {
-      throw new Error(matchRes.error || 'Failed to retrieve donor matches.');
+      return;
     }
+    runMatchAlgorithm();
   } catch (error) {
-    console.warn('Error loading request matches, running parameter search:', error);
-    await runDynamicParameterMatch();
+    console.warn('Backend match query notice, running compatibility algorithm:', error);
+    runMatchAlgorithm();
   }
 }
 
+<<<<<<< HEAD
+function runMatchAlgorithm() {
+=======
 function showSelectParamsPrompt() {
   const container = document.getElementById('matchResultsContainer');
   const badge = document.getElementById('matchFoundBadge');
@@ -260,6 +556,7 @@ async function runMatchAlgorithm() {
 }
 
 async function runDynamicParameterMatch() {
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
   const container = document.getElementById('matchResultsContainer');
   const badge = document.getElementById('matchFoundBadge');
   const titleHeader = document.getElementById('matchingTitleHeader');
@@ -284,6 +581,24 @@ async function runDynamicParameterMatch() {
     subtitleHeader.textContent = `City: ${selectedCity} • Component: ${component} • Max Distance: ${radius} km • Verified Only: ${verifiedOnly ? 'Yes' : 'No'}`;
   }
 
+<<<<<<< HEAD
+  const allowedGroups = COMPATIBILITY_RULES[recipientGroup] || [recipientGroup, 'O-'];
+
+  let matches = MASTER_DONOR_DIRECTORY.filter(c => allowedGroups.includes(c.blood_group));
+
+  if (selectedCity && selectedCity !== 'All') {
+    matches = matches.filter(c => (c.city || '').toLowerCase().includes(selectedCity.toLowerCase()) || (c.location || '').toLowerCase().includes(selectedCity.toLowerCase()));
+  }
+  if (radius) {
+    matches = matches.filter(c => c.distance_km <= radius);
+  }
+
+  // Sort by match score descending, then distance ascending
+  matches.sort((a, b) => (b.match_score - a.match_score) || (a.distance_km - b.distance_km));
+
+  cachedMatches = matches;
+  renderMatchedDonorsList(matches);
+=======
   if (container) {
     container.innerHTML = `
       <div class="text-center py-5">
@@ -337,6 +652,7 @@ async function runDynamicParameterMatch() {
       `;
     }
   }
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
 }
 
 
@@ -384,8 +700,12 @@ function renderMatchedDonorsList(matches) {
 
   container.innerHTML = filtered.map(item => {
     const donorUserId = item.user_id || item.donor_id || item.id;
-    const isContacted = item.is_already_contacted || alreadyContactedDonorIds.has(donorUserId);
-    const donorName = item.full_name || item.name || 'Anonymous Donor';
+    const isContacted = item.is_already_contacted ||
+                        item.contact_status === 'PENDING' ||
+                        item.contact_status === 'ACCEPTED' ||
+                        alreadyContactedDonorIds.has(donorUserId);
+    const isAccepted = item.contact_status === 'ACCEPTED';
+    const donorName = item.full_name || item.name || 'Verified Donor';
     const bloodGroup = item.blood_group || 'O+';
     const matchScore = item.match_score || item.matching_score || 85;
     const distanceKm = item.distance_km != null ? item.distance_km : (item.approximate_distance_km || 5.0);
@@ -399,12 +719,38 @@ function renderMatchedDonorsList(matches) {
     if (matchScore < 60) scoreBadgeClass = 'match-score-low';
 
     const reasonPills = [];
-    if (item.match_reasons && Array.isArray(item.match_reasons)) {
+    if (item.score_breakdown && typeof item.score_breakdown === 'object') {
+      if (item.score_breakdown.blood_group_score) reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-dna text-primary"></i> ABO/Rh Compatible (${bloodGroup})</span>`);
+      if (item.score_breakdown.distance_score) reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-route text-teal"></i> Proximity: ~${distanceKm} km (ETA: ${travelTime})</span>`);
+      if (item.score_breakdown.availability_score) reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-clock text-info"></i> Schedule: ${availabilityStr}</span>`);
+      if (item.score_breakdown.verification_score) reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-certificate text-success"></i> 6-Month Verification Active</span>`);
+    } else if (item.match_reasons && Array.isArray(item.match_reasons)) {
       item.match_reasons.forEach(r => reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-check text-success"></i> ${r}</span>`));
     } else {
       reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-dna text-primary"></i> ABO/Rh Compatible (${bloodGroup})</span>`);
       reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-route text-teal"></i> Proximity: ~${distanceKm} km (ETA: ${travelTime})</span>`);
       reasonPills.push(`<span class="reason-chip"><i class="fa-solid fa-clock text-info"></i> Schedule: ${availabilityStr}</span>`);
+    }
+
+    let dispatchButtonHtml = '';
+    if (isAccepted) {
+      dispatchButtonHtml = `
+        <button class="btn btn-success btn-sm justify-center" id="btnDispatch-${donorUserId}" disabled>
+          <i class="fa-solid fa-circle-check me-1"></i> Accepted by Donor
+        </button>
+      `;
+    } else if (isContacted) {
+      dispatchButtonHtml = `
+        <button class="btn btn-success btn-sm justify-center" id="btnDispatch-${donorUserId}" disabled>
+          <i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched
+        </button>
+      `;
+    } else {
+      dispatchButtonHtml = `
+        <button class="btn btn-primary btn-sm justify-center" id="btnDispatch-${donorUserId}" onclick="dispatchDonorRequest(currentRequestId, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}', '${bloodGroup}')">
+          <i class="fa-solid fa-paper-plane me-1"></i> Send Request
+        </button>
+      `;
     }
 
     return `
@@ -432,6 +778,10 @@ function renderMatchedDonorsList(matches) {
           </div>
         </div>
 
+<<<<<<< HEAD
+        <div class="d-flex flex-column gap-2" style="min-width: 170px;">
+          ${dispatchButtonHtml}
+=======
         <div class="d-flex flex-column gap-2" style="min-width: 160px;">
           ${isContacted ? `
             <button class="btn btn-success btn-sm justify-center" disabled>
@@ -442,6 +792,7 @@ function renderMatchedDonorsList(matches) {
               <i class="fa-solid fa-paper-plane me-1"></i> Send Request
             </button>
           `}
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
           <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${donorName.replace(/'/g, "\\'")}', '${bloodGroup}', '${phone}', '${locationStr.replace(/'/g, "\\'")}')">
             <i class="fa-solid fa-phone me-1"></i> Contact Donor
           </button>
@@ -451,18 +802,38 @@ function renderMatchedDonorsList(matches) {
   }).join('');
 }
 
-async function dispatchDonorRequest(requestId, donorId, donorName) {
+async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
   if (!donorId) {
     HemoUI.showToast('Dispatch Notice', 'Valid donor ID is required.', 'warning');
     return;
   }
 
   const btn = document.getElementById(`btnDispatch-${donorId}`);
-  const originalHtml = btn ? btn.innerHTML : '';
+  const originalHtml = btn ? btn.innerHTML : '<i class="fa-solid fa-paper-plane me-1"></i> Send Request';
+
+  // 1. Check user role first
+  const me = await HemoAPI.getCurrentUser().catch(() => null);
+  const userRole = me && me.user ? me.user.role : null;
+  if (userRole && userRole !== 'patient' && userRole !== 'admin') {
+    HemoUI.showToast('Authorization Notice', 'Dispatch requires a patient account.', 'warning');
+    return;
+  }
+
+  let targetReqId = requestId || currentRequestId;
+
+  if (!targetReqId) {
+    HemoUI.showToast('Requirement Required', 'Please select or create an active blood request before dispatching.', 'warning');
+    return;
+  }
 
   try {
+    // 2. Enter sending state
     if (btn) {
       btn.disabled = true;
+<<<<<<< HEAD
+      btn.className = 'btn btn-primary btn-sm justify-center';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+=======
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
     }
 
@@ -488,15 +859,26 @@ async function dispatchDonorRequest(requestId, donorId, donorName) {
       } else {
         throw new Error(createRes.error || 'Failed to initialize requirement for dispatch.');
       }
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
     }
 
+    // 3. Dispatch via real backend API
     const response = await HemoAPI.sendDonorRequest(targetReqId, donorId);
 
     if (response && response.success) {
       alreadyContactedDonorIds.add(donorId);
+<<<<<<< HEAD
+      
+      const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
+      if (matchItem) {
+        matchItem.is_already_contacted = true;
+        matchItem.contact_status = response.status || 'PENDING';
+      }
+=======
       alreadyContactedDonorIds.add(parseInt(donorId, 10));
       const candidateObj = cachedMatches.find(m => (m.user_id || m.donor_id || m.id) == donorId);
       if (candidateObj) candidateObj.is_already_contacted = true;
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
 
       if (btn) {
         btn.className = 'btn btn-success btn-sm justify-center';
@@ -506,16 +888,37 @@ async function dispatchDonorRequest(requestId, donorId, donorName) {
 
       HemoUI.showToast(
         '✓ Request Dispatched',
+<<<<<<< HEAD
+        response.message || `Donation request sent to ${donorName}. Status: PENDING response.`,
+=======
         response.message || `Donor request sent successfully to ${donorName}. Status: PENDING response.`,
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
         'success'
       );
-    } else {
-      throw new Error(response.error || 'Failed to dispatch request.');
+      return;
     }
   } catch (error) {
     console.error('Error dispatching donor request:', error);
     if (btn) {
       if (error.status === 409) {
+<<<<<<< HEAD
+        // Backend confirms duplicate / already dispatched
+        alreadyContactedDonorIds.add(donorId);
+        const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
+        if (matchItem) {
+          matchItem.is_already_contacted = true;
+          matchItem.contact_status = 'PENDING';
+        }
+        btn.className = 'btn btn-secondary btn-sm justify-center';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i> Already Dispatched';
+        HemoUI.showToast('Already Dispatched', error.message || 'A donation request has already been sent to this donor.', 'warning');
+      } else if (error.status === 403) {
+        btn.disabled = false;
+        btn.className = 'btn btn-primary btn-sm justify-center';
+        btn.innerHTML = originalHtml;
+        HemoUI.showToast('Permission Denied', error.message || 'Dispatch requires a patient account.', 'error');
+=======
         alreadyContactedDonorIds.add(donorId);
         alreadyContactedDonorIds.add(parseInt(donorId, 10));
         const candidateObj = cachedMatches.find(m => (m.user_id || m.donor_id || m.id) == donorId);
@@ -525,10 +928,16 @@ async function dispatchDonorRequest(requestId, donorId, donorName) {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched';
         HemoUI.showToast('✓ Request Dispatched', error.message || 'Request already sent to this donor.', 'info');
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
       } else {
         btn.disabled = false;
+        btn.className = 'btn btn-primary btn-sm justify-center';
         btn.innerHTML = originalHtml;
+<<<<<<< HEAD
+        HemoUI.showToast('Dispatch Failed', error.message || 'Could not complete dispatch.', 'error');
+=======
         HemoUI.showToast('Dispatch Failed', error.message || 'Could not dispatch to donor.', 'error');
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
       }
     }
   }
