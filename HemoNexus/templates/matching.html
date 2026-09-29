@@ -703,6 +703,20 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
           matchItem.contact_status = response.status || 'PENDING';
         }
 
+        // Record live activity in session storage
+        try {
+          const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
+          acts.unshift({
+            type: 'DISPATCH',
+            title: '✓ Donor Dispatch Confirmed',
+            desc: `${donorName} — ${bloodGroup || 'A+'} donor request dispatched`,
+            timestamp: new Date().toISOString(),
+            iconClass: 'activity-icon-success',
+            icon: 'fa-paper-plane'
+          });
+          sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
+        } catch (e) {}
+
         if (btn) {
           btn.className = 'btn btn-success btn-sm justify-center';
           btn.disabled = true;
@@ -725,6 +739,20 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         matchItem.is_already_contacted = true;
         matchItem.contact_status = 'PENDING';
       }
+
+      // Record live activity in session storage
+      try {
+        const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
+        acts.unshift({
+          type: 'DISPATCH',
+          title: '✓ Donor Dispatch Confirmed',
+          desc: `${donorName} — ${bloodGroup || 'A+'} donor request dispatched`,
+          timestamp: new Date().toISOString(),
+          iconClass: 'activity-icon-success',
+          icon: 'fa-paper-plane'
+        });
+        sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
+      } catch (e) {}
 
       if (btn) {
         btn.className = 'btn btn-success btn-sm justify-center';
