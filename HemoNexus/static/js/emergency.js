@@ -45,12 +45,13 @@ const startEmergencyBroadcast = async () => {
 
   try {
     // 2. Create Real Emergency Blood Request on Backend
+    const hospitalName = document.getElementById('emergencyHospitalName')?.value?.trim() || 'Regional Emergency Trauma Center';
+    const locationVal = document.getElementById('emergencyLocation')?.value?.trim() || 'Kolkata';
+
     const reqPayload = {
       required_blood_group: bloodGroup,
-      hospital_name: 'Lilavati Hospital & Research Centre, ICU Trauma',
-      location: 'Lilavati Hospital ICU Bay #01',
-      latitude: 22.5697,
-      longitude: 88.4046,
+      hospital_name: hospitalName,
+      location: locationVal,
       urgency: 'CRITICAL',
       required_units: 3,
       preferred_max_distance: radius
@@ -102,15 +103,18 @@ const startEmergencyBroadcast = async () => {
         responseFeed.innerHTML = `
           <div class="empty-state py-4 text-center">
             <div class="empty-state-icon mb-2"><i class="fa-solid fa-satellite-dish text-warning fa-2x animate-pulse-sos"></i></div>
-            <h5 class="fw-bold text-slate-900">Broadcast Transmitted — Zero Immediate Donors</h5>
-            <p class="text-xs text-muted">No registered donors within ${radius} km perimeter. Request #${activeEmergencyRequestId} remains active in matching pipeline.</p>
+            <h5 class="fw-bold text-slate-900">No donor responses yet.</h5>
+            <p class="text-xs text-muted">Broadcast transmitted. Request #${activeEmergencyRequestId} is active — waiting for compatible donors to respond.</p>
+            <a href="/match?request_id=${activeEmergencyRequestId}" class="btn btn-outline-primary btn-sm mt-2">
+              <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Open Match Engine
+            </a>
           </div>
         `;
       }
       return;
     }
 
-    // 5. Render Real Match Cards and Dispatch
+    // 5. Render Real Match Cards — Alert Sent (not Dispatched)
     matches.forEach(match => {
       const donorUserId = match.user_id || match.donor_id || match.id;
       const donorName = match.full_name || match.name || 'Verified Donor';
@@ -144,13 +148,6 @@ const startEmergencyBroadcast = async () => {
       `;
       if (responseFeed) responseFeed.appendChild(card);
     });
-
-    // Auto-dispatch all matching candidates for Code-Red SOS
-    for (const match of matches) {
-      const donorUserId = match.user_id || match.donor_id || match.id;
-      const donorName = match.full_name || match.name || 'Verified Donor';
-      await dispatchEmergencySingleDonor(activeEmergencyRequestId, donorUserId, donorName);
-    }
 
     // 6. Start Real Live Response Polling
     startEmergencyResponsePolling(activeEmergencyRequestId);

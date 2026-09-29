@@ -31,6 +31,7 @@
       <div class="form-group">
         <label class="form-label">Target City / Location *</label>
         <select class="form-select" id="matchCityLocation" onchange="runMatchAlgorithm()">
+          <option value="" disabled selected>Select city / location</option>
           <option value="Kolkata">Kolkata</option>
           <option value="Mumbai">Mumbai</option>
           <option value="Delhi">Delhi</option>
@@ -45,6 +46,7 @@
       <div class="form-group">
         <label class="form-label">Patient Blood Group *</label>
         <select class="form-select" id="matchRecipientGroup" onchange="runMatchAlgorithm()">
+          <option value="" disabled {% if not pre_group %}selected{% endif %}>Select blood group</option>
           <option value="O-" {% if pre_group == 'O-' %}selected{% endif %}>O- (Universal Recipient from O- only)</option>
           <option value="O+" {% if pre_group == 'O+' %}selected{% endif %}>O+ (Receives O-, O+)</option>
           <option value="A-" {% if pre_group == 'A-' %}selected{% endif %}>A- (Receives A-, O-)</option>
@@ -59,6 +61,7 @@
       <div class="form-group">
         <label class="form-label">Component Needed *</label>
         <select class="form-select" id="matchComponent" onchange="runMatchAlgorithm()">
+          <option value="" disabled {% if not pre_comp %}selected{% endif %}>Select component</option>
           <option value="Whole Blood" {% if pre_comp == 'Whole Blood' %}selected{% endif %}>Whole Blood (Standard)</option>
           <option value="Platelets" {% if pre_comp == 'Platelets' %}selected{% endif %}>Single Donor Platelets (SDP)</option>
           <option value="Plasma" {% if pre_comp == 'Plasma' %}selected{% endif %}>Fresh Frozen Plasma (FFP)</option>
@@ -392,6 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentRequestId = parseInt(reqIdParam, 10);
     await loadMatchesForRequest(currentRequestId);
   } else {
+<<<<<<< HEAD
     // Check if patient has any existing requests
     try {
       const patientRequestsRes = await HemoAPI.getPatientRequests().catch(() => null);
@@ -416,6 +420,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (err) {
       runMatchAlgorithm();
+=======
+    // New search — do NOT auto-run matching. Show blank prompt state.
+    currentRequestId = null;
+    currentRequestData = null;
+    alreadyContactedDonorIds.clear();
+
+    const hasUrlParams = group || comp || city;
+    if (hasUrlParams) {
+      // URL params were explicitly passed (e.g. from another page) — run matching
+      await runDynamicParameterMatch();
+    } else {
+      // Completely fresh page load — show empty prompt, wait for user input
+      showSelectParamsPrompt();
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
     }
   }
 });
@@ -497,17 +515,64 @@ async function loadMatchesForRequest(requestId) {
   }
 }
 
+<<<<<<< HEAD
 function runMatchAlgorithm() {
+=======
+function showSelectParamsPrompt() {
   const container = document.getElementById('matchResultsContainer');
   const badge = document.getElementById('matchFoundBadge');
   const titleHeader = document.getElementById('matchingTitleHeader');
   const subtitleHeader = document.getElementById('matchingSubtitleHeader');
 
-  const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
-  const recipientGroup = document.getElementById('matchRecipientGroup')?.value || 'A+';
-  const component = document.getElementById('matchComponent')?.value || 'Whole Blood';
+  if (badge) {
+    badge.className = 'badge badge-warning';
+    badge.textContent = 'Select Parameters';
+  }
+  if (titleHeader) {
+    titleHeader.innerHTML = 'Ranked Compatible Candidates';
+  }
+  if (subtitleHeader) {
+    subtitleHeader.textContent = 'Select city, blood group, and component above to find compatible donors.';
+  }
+  if (container) {
+    container.innerHTML = `
+      <div class="empty-state py-5 text-center">
+        <div class="empty-state-icon mb-3"><i class="fa-solid fa-sliders text-primary fa-2x"></i></div>
+        <h4 class="empty-state-title fw-bold text-slate-900">Select Requirement Parameters</h4>
+        <p class="empty-state-desc text-muted small mx-auto" style="max-width: 480px;">
+          Choose a city / location, patient blood group, and component needed above to search for compatible donors.
+        </p>
+      </div>
+    `;
+  }
+}
+
+async function runMatchAlgorithm() {
+  if (currentRequestId) {
+    await loadMatchesForRequest(currentRequestId);
+  } else {
+    await runDynamicParameterMatch();
+  }
+}
+
+async function runDynamicParameterMatch() {
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
+  const container = document.getElementById('matchResultsContainer');
+  const badge = document.getElementById('matchFoundBadge');
+  const titleHeader = document.getElementById('matchingTitleHeader');
+  const subtitleHeader = document.getElementById('matchingSubtitleHeader');
+
+  const selectedCity = document.getElementById('matchCityLocation')?.value || '';
+  const recipientGroup = document.getElementById('matchRecipientGroup')?.value || '';
+  const component = document.getElementById('matchComponent')?.value || '';
   const radius = parseFloat(document.getElementById('matchRadius')?.value || '15');
   const verifiedOnly = document.getElementById('matchVerifiedOnly')?.checked || false;
+
+  // Guard: all three required fields must have a value before running matching
+  if (!selectedCity || !recipientGroup || !component) {
+    showSelectParamsPrompt();
+    return;
+  }
 
   if (titleHeader) {
     titleHeader.innerHTML = `Ranked Compatible Candidates for <span class="blood-badge blood-badge-sm ms-2">${recipientGroup}</span>`;
@@ -516,6 +581,7 @@ function runMatchAlgorithm() {
     subtitleHeader.textContent = `City: ${selectedCity} • Component: ${component} • Max Distance: ${radius} km • Verified Only: ${verifiedOnly ? 'Yes' : 'No'}`;
   }
 
+<<<<<<< HEAD
   const allowedGroups = COMPATIBILITY_RULES[recipientGroup] || [recipientGroup, 'O-'];
 
   let matches = MASTER_DONOR_DIRECTORY.filter(c => allowedGroups.includes(c.blood_group));
@@ -532,7 +598,63 @@ function runMatchAlgorithm() {
 
   cachedMatches = matches;
   renderMatchedDonorsList(matches);
+=======
+  if (container) {
+    container.innerHTML = `
+      <div class="text-center py-5">
+        <i class="fa-solid fa-spinner fa-spin text-primary fs-3 mb-2"></i>
+        <p class="text-muted small">Querying clinical database for compatible ${recipientGroup} donors in ${selectedCity}...</p>
+      </div>
+    `;
+  }
+  if (badge) {
+    badge.className = 'badge badge-warning';
+    badge.textContent = 'Searching...';
+  }
+
+  try {
+    // Create a temporary blood request to run the backend matching engine
+    const createRes = await HemoAPI.createBloodRequest({
+      required_blood_group: recipientGroup,
+      hospital_name: `${selectedCity} Search`,
+      location: selectedCity,
+      urgency: 'ROUTINE',
+      required_units: 1,
+      preferred_max_distance: radius
+    });
+
+    if (!createRes || !createRes.success || !createRes.request) {
+      throw new Error(createRes?.error || 'Could not run matching query.');
+    }
+
+    const tempReqId = createRes.request.id;
+    const matchRes = await HemoAPI.getRequestMatches(tempReqId);
+
+    if (matchRes && matchRes.success && Array.isArray(matchRes.matches)) {
+      cachedMatches = matchRes.matches;
+      renderMatchedDonorsList(cachedMatches);
+    } else {
+      throw new Error(matchRes?.error || 'No matching data returned from server.');
+    }
+  } catch (error) {
+    console.error('Error in dynamic parameter match:', error);
+    if (badge) {
+      badge.className = 'badge badge-danger';
+      badge.textContent = 'Error';
+    }
+    if (container) {
+      container.innerHTML = `
+        <div class="empty-state py-5 text-center">
+          <div class="empty-state-icon mb-3"><i class="fa-solid fa-triangle-exclamation text-danger fa-2x"></i></div>
+          <h4 class="empty-state-title fw-bold text-slate-900">Matching Query Failed</h4>
+          <p class="empty-state-desc text-muted small">${error.message || 'Could not retrieve donor matches. Please try again.'}</p>
+        </div>
+      `;
+    }
+  }
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
 }
+
 
 function renderMatchedDonorsList(matches) {
   const container = document.getElementById('matchResultsContainer');
@@ -656,8 +778,21 @@ function renderMatchedDonorsList(matches) {
           </div>
         </div>
 
+<<<<<<< HEAD
         <div class="d-flex flex-column gap-2" style="min-width: 170px;">
           ${dispatchButtonHtml}
+=======
+        <div class="d-flex flex-column gap-2" style="min-width: 160px;">
+          ${isContacted ? `
+            <button class="btn btn-success btn-sm justify-center" disabled>
+              <i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched
+            </button>
+          ` : `
+            <button class="btn btn-primary btn-sm justify-center" id="btnDispatch-${donorUserId}" onclick="dispatchDonorRequest(currentRequestId, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}')">
+              <i class="fa-solid fa-paper-plane me-1"></i> Send Request
+            </button>
+          `}
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
           <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${donorName.replace(/'/g, "\\'")}', '${bloodGroup}', '${phone}', '${locationStr.replace(/'/g, "\\'")}')">
             <i class="fa-solid fa-phone me-1"></i> Contact Donor
           </button>
@@ -695,8 +830,36 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
     // 2. Enter sending state
     if (btn) {
       btn.disabled = true;
+<<<<<<< HEAD
       btn.className = 'btn btn-primary btn-sm justify-center';
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+=======
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+    }
+
+    let targetReqId = requestId || currentRequestId;
+
+    if (!targetReqId) {
+      const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
+      const recipientGroup = document.getElementById('matchRecipientGroup')?.value || 'A+';
+      const radius = parseFloat(document.getElementById('matchRadius')?.value || '15');
+
+      const createRes = await HemoAPI.createBloodRequest({
+        required_blood_group: recipientGroup,
+        hospital_name: `${selectedCity} Regional Triage Center`,
+        location: selectedCity,
+        urgency: 'URGENT',
+        required_units: 1,
+        preferred_max_distance: radius
+      });
+
+      if (createRes && createRes.success && createRes.request) {
+        targetReqId = createRes.request.id;
+        currentRequestId = targetReqId;
+      } else {
+        throw new Error(createRes.error || 'Failed to initialize requirement for dispatch.');
+      }
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
     }
 
     // 3. Dispatch via real backend API
@@ -704,12 +867,18 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
     if (response && response.success) {
       alreadyContactedDonorIds.add(donorId);
+<<<<<<< HEAD
       
       const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
       if (matchItem) {
         matchItem.is_already_contacted = true;
         matchItem.contact_status = response.status || 'PENDING';
       }
+=======
+      alreadyContactedDonorIds.add(parseInt(donorId, 10));
+      const candidateObj = cachedMatches.find(m => (m.user_id || m.donor_id || m.id) == donorId);
+      if (candidateObj) candidateObj.is_already_contacted = true;
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
 
       if (btn) {
         btn.className = 'btn btn-success btn-sm justify-center';
@@ -719,7 +888,11 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
       HemoUI.showToast(
         '✓ Request Dispatched',
+<<<<<<< HEAD
         response.message || `Donation request sent to ${donorName}. Status: PENDING response.`,
+=======
+        response.message || `Donor request sent successfully to ${donorName}. Status: PENDING response.`,
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
         'success'
       );
       return;
@@ -728,6 +901,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
     console.error('Error dispatching donor request:', error);
     if (btn) {
       if (error.status === 409) {
+<<<<<<< HEAD
         // Backend confirms duplicate / already dispatched
         alreadyContactedDonorIds.add(donorId);
         const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
@@ -744,11 +918,26 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         btn.className = 'btn btn-primary btn-sm justify-center';
         btn.innerHTML = originalHtml;
         HemoUI.showToast('Permission Denied', error.message || 'Dispatch requires a patient account.', 'error');
+=======
+        alreadyContactedDonorIds.add(donorId);
+        alreadyContactedDonorIds.add(parseInt(donorId, 10));
+        const candidateObj = cachedMatches.find(m => (m.user_id || m.donor_id || m.id) == donorId);
+        if (candidateObj) candidateObj.is_already_contacted = true;
+
+        btn.className = 'btn btn-success btn-sm justify-center';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched';
+        HemoUI.showToast('✓ Request Dispatched', error.message || 'Request already sent to this donor.', 'info');
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
       } else {
         btn.disabled = false;
         btn.className = 'btn btn-primary btn-sm justify-center';
         btn.innerHTML = originalHtml;
+<<<<<<< HEAD
         HemoUI.showToast('Dispatch Failed', error.message || 'Could not complete dispatch.', 'error');
+=======
+        HemoUI.showToast('Dispatch Failed', error.message || 'Could not dispatch to donor.', 'error');
+>>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
       }
     }
   }

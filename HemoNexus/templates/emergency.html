@@ -31,7 +31,7 @@
     <div class="d-flex align-center justify-between gap-2 p-2 rounded-lg bg-light border flex-wrap">
       <div class="d-flex align-center gap-2">
         <span class="badge badge-danger">1. HOSPITAL</span>
-        <span class="small fw-semibold text-ink">Lilavati ICU</span>
+        <span class="small fw-semibold text-ink" id="pipelineHospitalLabel">{{ current_user.location if current_user and current_user.location else 'Kolkata' }} Regional Trauma</span>
       </div>
       <i class="fa-solid fa-arrow-right text-primary animate-pulse-sos"></i>
       <div class="d-flex align-center gap-2">
@@ -100,8 +100,9 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Destination Hospital ICU</label>
-        <input type="text" class="form-control" value="Lilavati Hospital & Research Centre, Bandra" readonly>
+        <label class="form-label">Destination Hospital ICU / Trauma Center *</label>
+        <input type="text" class="form-control" id="emergencyHospitalName" placeholder="e.g. Apollo Multispecialty Hospital, Kolkata" value="Regional Emergency Trauma Center, {{ current_user.location if current_user and current_user.location else 'Kolkata' }}" required>
+        <input type="hidden" id="emergencyLocation" value="{{ current_user.location if current_user and current_user.location else 'Kolkata' }}">
       </div>
 
       <button type="button" id="btnTriggerBroadcast" class="btn btn-emergency btn-lg w-full mt-4 justify-center">
@@ -123,7 +124,7 @@
       </div>
 
       <div class="d-flex align-center justify-between p-3 rounded-lg border mb-4">
-        <span class="text-xs text-muted fw-semibold text-uppercase">Responses Received</span>
+        <span class="text-xs text-muted fw-semibold text-uppercase">Alerts Sent</span>
         <span class="text-sm fw-extrabold text-success" id="liveResponseCount">0</span>
       </div>
 
@@ -137,8 +138,8 @@
   <div class="card">
     <div class="card-header">
       <div class="d-flex align-center gap-2">
-        <h3 class="card-title">Live Inbound Donor Responses</h3>
-        <span class="badge badge-success"><i class="fa-solid fa-circle-dot animate-pulse-dot"></i> Live Stream</span>
+        <h3 class="card-title">Alerted Donors — Awaiting Response</h3>
+        <span class="badge badge-warning"><i class="fa-solid fa-satellite-dish animate-pulse-sos"></i> Broadcast Active</span>
       </div>
     </div>
 

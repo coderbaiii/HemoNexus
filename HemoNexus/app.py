@@ -68,14 +68,29 @@ def login_required_web(f):
 
 @app.context_processor
 def inject_user():
-    """Inject current user details into all Jinja templates."""
+    """Inject current user details into all Jinja templates with profile location."""
     user = None
     if 'user_id' in session:
+        uid = session.get('user_id')
+        user_loc = "Kolkata"
+        try:
+            conn = get_db()
+            role = session.get('role', 'donor')
+            if role == 'donor':
+                prof = query_db("SELECT location FROM donor_profiles WHERE user_id = ?", (uid,), one=True, db=conn)
+            else:
+                prof = query_db("SELECT location FROM patient_profiles WHERE user_id = ?", (uid,), one=True, db=conn)
+            if prof and prof["location"]:
+                user_loc = prof["location"]
+        except Exception:
+            pass
+
         user = {
-            'id': session.get('user_id'),
+            'id': uid,
             'name': session.get('user_name', 'User'),
             'email': session.get('user_email', ''),
-            'role': session.get('role', 'donor')
+            'role': session.get('role', 'donor'),
+            'location': user_loc
         }
     return dict(current_user=user, is_logged_in=('user_id' in session))
 
@@ -260,29 +275,72 @@ REQUESTS = [
     }
 ]
 
-ACTIVITIES = [
-    {
-        "title": "Donor Dispatch Confirmed",
-        "desc": "Aarav Sharma accepted emergency request REQ-4091 for AMRI Hospital.",
-        "time": "12 mins ago",
-        "icon": "fa-truck-medical",
-        "iconClass": "stat-icon-primary"
-    },
-    {
-        "title": "New Blood Request Registered",
-        "desc": "Emergency O- Whole Blood request logged by AMRI ICU.",
-        "time": "45 mins ago",
-        "icon": "fa-droplet",
-        "iconClass": "stat-icon-danger"
-    },
-    {
-        "title": "Donation Completed & Verified",
-        "desc": "Devendra Joshi request fulfilled with 2 units of B+ RBC.",
-        "time": "2 hours ago",
-        "icon": "fa-circle-check",
-        "iconClass": "stat-icon-success"
-    }
-]
+ACTIVITIES = []
+
+def get_real_activities(db=None):
+    """Fetches real dispatch and emergency activity from the SQLite database."""
+    conn = db or get_db()
+    activities = []
+    try:
+        # Real donor dispatch responses from database
+        sql = """
+            SELECT r.id, r.status, r.created_at, r.response_time,
+                   br.id AS request_id, br.required_blood_group, br.hospital_name, br.location,
+                   u.full_name AS donor_name
+            FROM donor_request_responses r
+            JOIN blood_requests br ON r.blood_request_id = br.id
+            JOIN users u ON r.donor_id = u.id
+            ORDER BY r.created_at DESC LIMIT 8
+        """
+        dispatches = query_db(sql, db=conn)
+        for d in (dispatches or []):
+            status = d.get("status", "PENDING")
+            b_group = d.get("required_blood_group", "O+")
+            hosp = d.get("hospital_name") or "Regional Medical Center"
+            donor = d.get("donor_name") or "Verified Donor"
+            loc = d.get("location") or "Kolkata"
+
+            if status == "ACCEPTED":
+                title = "Donor Dispatch Confirmed"
+                desc = f"{donor} accepted {b_group} emergency request #{d['request_id']} for {hosp}."
+                icon = "fa-truck-medical"
+                icon_class = "stat-icon-success"
+            elif status == "REJECTED":
+                title = "Dispatch Response Received"
+                desc = f"{donor} was unavailable for {b_group} request #{d['request_id']}."
+                icon = "fa-circle-xmark"
+                icon_class = "stat-icon-warning"
+            else:
+                title = "Donor Request Dispatched"
+                desc = f"{b_group} requirement invitation sent to {donor} for {hosp} ({loc})."
+                icon = "fa-paper-plane"
+                icon_class = "stat-icon-primary"
+
+            activities.append({
+                "title": title,
+                "desc": desc,
+                "time": "Just now",
+                "icon": icon,
+                "iconClass": icon_class
+            })
+
+        # If no dispatches yet, check audit_logs
+        if not activities:
+            logs = query_db("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 5", db=conn)
+            for log in (logs or []):
+                action = log.get("action", "")
+                if action in ("INIT_ADMIN", "LOGIN_SUCCESS", "LOGOUT"):
+                    continue
+                activities.append({
+                    "title": action.replace("_", " ").title(),
+                    "desc": log.get("details", "System activity logged"),
+                    "time": "Recent",
+                    "icon": "fa-bell",
+                    "iconClass": "stat-icon-primary"
+                })
+    except Exception:
+        pass
+    return activities
 
 
 @app.route('/')
@@ -462,14 +520,62 @@ def home():
 @app.route('/dashboard')
 @app.route('/dashboard.html')
 def dashboard():
+    real_requests = []
+    real_activities = []
+    critical_alert = None
+    try:
+        conn = get_db()
+        db_reqs = query_db(
+            """SELECT br.*, 
+                      COUNT(r.id) AS total_sent,
+                      SUM(CASE WHEN r.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted_count,
+                      SUM(CASE WHEN r.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count
+               FROM blood_requests br
+               LEFT JOIN donor_request_responses r ON br.id = r.blood_request_id
+               GROUP BY br.id
+               ORDER BY br.created_at DESC LIMIT 5""",
+            db=conn
+        )
+        if db_reqs:
+            for r in db_reqs:
+                real_requests.append({
+                    "id": f"REQ-{r['id']}",
+                    "patientName": f"Requirement #{r['id']}",
+                    "bloodGroup": r["required_blood_group"],
+                    "component": "Whole Blood",
+                    "unitsNeeded": r["required_units"],
+                    "unitsFulfilled": r["accepted_count"] or 0,
+                    "hospital": r["hospital_name"],
+                    "location": r["location"],
+                    "urgency": (r["urgency"] or "NORMAL").lower(),
+                    "status": (r["request_status"] or "OPEN").lower(),
+                    "requiredBy": r["required_date_time"] or "Immediate",
+                    "createdAt": r["created_at"] or "",
+                    "contactPhone": "+91 98222 00112"
+                })
+                if (r["urgency"] or "").upper() == "CRITICAL" and not critical_alert:
+                    critical_alert = f"{r['hospital_name']} ({r['location']}) urgently requires {r['required_units']} units of {r['required_blood_group']} (REQ-{r['id']})."
+
+        real_activities = get_real_activities(conn)
+    except Exception:
+        pass
+
     return render_template(
         'dashboard.html',
         is_public_page=False,
         active_page='dashboard',
         donors=DONORS,
-        requests=REQUESTS,
-        activities=ACTIVITIES
+        requests=real_requests,
+        activities=real_activities,
+        critical_alert=critical_alert
     )
+
+
+@app.route('/api/activities')
+@app.route('/api/patient/activities')
+def api_activities():
+    """Returns live database activities and dispatches for the dashboard."""
+    return jsonify({"success": True, "activities": get_real_activities()}), 200
 
 
 @app.route('/donors')
@@ -521,8 +627,8 @@ def request_create():
 @app.route('/search')
 @app.route('/match.html')
 def matching():
-    pre_group = request.args.get('group', 'O-')
-    pre_comp = request.args.get('component', 'Whole Blood')
+    pre_group = request.args.get('group', '')
+    pre_comp = request.args.get('component', '')
     return render_template(
         'matching.html',
         is_public_page=False,
