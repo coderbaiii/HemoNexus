@@ -395,7 +395,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentRequestId = parseInt(reqIdParam, 10);
     await loadMatchesForRequest(currentRequestId);
   } else {
-<<<<<<< HEAD
     // Check if patient has any existing requests
     try {
       const patientRequestsRes = await HemoAPI.getPatientRequests().catch(() => null);
@@ -420,20 +419,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (err) {
       runMatchAlgorithm();
-=======
-    // New search — do NOT auto-run matching. Show blank prompt state.
-    currentRequestId = null;
-    currentRequestData = null;
-    alreadyContactedDonorIds.clear();
-
-    const hasUrlParams = group || comp || city;
-    if (hasUrlParams) {
-      // URL params were explicitly passed (e.g. from another page) — run matching
-      await runDynamicParameterMatch();
-    } else {
-      // Completely fresh page load — show empty prompt, wait for user input
-      showSelectParamsPrompt();
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
     }
   }
 });
@@ -515,48 +500,7 @@ async function loadMatchesForRequest(requestId) {
   }
 }
 
-<<<<<<< HEAD
 function runMatchAlgorithm() {
-=======
-function showSelectParamsPrompt() {
-  const container = document.getElementById('matchResultsContainer');
-  const badge = document.getElementById('matchFoundBadge');
-  const titleHeader = document.getElementById('matchingTitleHeader');
-  const subtitleHeader = document.getElementById('matchingSubtitleHeader');
-
-  if (badge) {
-    badge.className = 'badge badge-warning';
-    badge.textContent = 'Select Parameters';
-  }
-  if (titleHeader) {
-    titleHeader.innerHTML = 'Ranked Compatible Candidates';
-  }
-  if (subtitleHeader) {
-    subtitleHeader.textContent = 'Select city, blood group, and component above to find compatible donors.';
-  }
-  if (container) {
-    container.innerHTML = `
-      <div class="empty-state py-5 text-center">
-        <div class="empty-state-icon mb-3"><i class="fa-solid fa-sliders text-primary fa-2x"></i></div>
-        <h4 class="empty-state-title fw-bold text-slate-900">Select Requirement Parameters</h4>
-        <p class="empty-state-desc text-muted small mx-auto" style="max-width: 480px;">
-          Choose a city / location, patient blood group, and component needed above to search for compatible donors.
-        </p>
-      </div>
-    `;
-  }
-}
-
-async function runMatchAlgorithm() {
-  if (currentRequestId) {
-    await loadMatchesForRequest(currentRequestId);
-  } else {
-    await runDynamicParameterMatch();
-  }
-}
-
-async function runDynamicParameterMatch() {
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
   const container = document.getElementById('matchResultsContainer');
   const badge = document.getElementById('matchFoundBadge');
   const titleHeader = document.getElementById('matchingTitleHeader');
@@ -581,7 +525,6 @@ async function runDynamicParameterMatch() {
     subtitleHeader.textContent = `City: ${selectedCity} • Component: ${component} • Max Distance: ${radius} km • Verified Only: ${verifiedOnly ? 'Yes' : 'No'}`;
   }
 
-<<<<<<< HEAD
   const allowedGroups = COMPATIBILITY_RULES[recipientGroup] || [recipientGroup, 'O-'];
 
   let matches = MASTER_DONOR_DIRECTORY.filter(c => allowedGroups.includes(c.blood_group));
@@ -598,61 +541,6 @@ async function runDynamicParameterMatch() {
 
   cachedMatches = matches;
   renderMatchedDonorsList(matches);
-=======
-  if (container) {
-    container.innerHTML = `
-      <div class="text-center py-5">
-        <i class="fa-solid fa-spinner fa-spin text-primary fs-3 mb-2"></i>
-        <p class="text-muted small">Querying clinical database for compatible ${recipientGroup} donors in ${selectedCity}...</p>
-      </div>
-    `;
-  }
-  if (badge) {
-    badge.className = 'badge badge-warning';
-    badge.textContent = 'Searching...';
-  }
-
-  try {
-    // Create a temporary blood request to run the backend matching engine
-    const createRes = await HemoAPI.createBloodRequest({
-      required_blood_group: recipientGroup,
-      hospital_name: `${selectedCity} Search`,
-      location: selectedCity,
-      urgency: 'ROUTINE',
-      required_units: 1,
-      preferred_max_distance: radius
-    });
-
-    if (!createRes || !createRes.success || !createRes.request) {
-      throw new Error(createRes?.error || 'Could not run matching query.');
-    }
-
-    const tempReqId = createRes.request.id;
-    const matchRes = await HemoAPI.getRequestMatches(tempReqId);
-
-    if (matchRes && matchRes.success && Array.isArray(matchRes.matches)) {
-      cachedMatches = matchRes.matches;
-      renderMatchedDonorsList(cachedMatches);
-    } else {
-      throw new Error(matchRes?.error || 'No matching data returned from server.');
-    }
-  } catch (error) {
-    console.error('Error in dynamic parameter match:', error);
-    if (badge) {
-      badge.className = 'badge badge-danger';
-      badge.textContent = 'Error';
-    }
-    if (container) {
-      container.innerHTML = `
-        <div class="empty-state py-5 text-center">
-          <div class="empty-state-icon mb-3"><i class="fa-solid fa-triangle-exclamation text-danger fa-2x"></i></div>
-          <h4 class="empty-state-title fw-bold text-slate-900">Matching Query Failed</h4>
-          <p class="empty-state-desc text-muted small">${error.message || 'Could not retrieve donor matches. Please try again.'}</p>
-        </div>
-      `;
-    }
-  }
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
 }
 
 
@@ -748,7 +636,7 @@ function renderMatchedDonorsList(matches) {
     } else {
       dispatchButtonHtml = `
         <button class="btn btn-primary btn-sm justify-center" id="btnDispatch-${donorUserId}" onclick="dispatchDonorRequest(currentRequestId, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}', '${bloodGroup}')">
-          <i class="fa-solid fa-paper-plane me-1"></i> Send Request
+          <i class="fa-solid fa-paper-plane me-1"></i> Dispatch Donor
         </button>
       `;
     }
@@ -778,21 +666,8 @@ function renderMatchedDonorsList(matches) {
           </div>
         </div>
 
-<<<<<<< HEAD
         <div class="d-flex flex-column gap-2" style="min-width: 170px;">
           ${dispatchButtonHtml}
-=======
-        <div class="d-flex flex-column gap-2" style="min-width: 160px;">
-          ${isContacted ? `
-            <button class="btn btn-success btn-sm justify-center" disabled>
-              <i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched
-            </button>
-          ` : `
-            <button class="btn btn-primary btn-sm justify-center" id="btnDispatch-${donorUserId}" onclick="dispatchDonorRequest(currentRequestId, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}')">
-              <i class="fa-solid fa-paper-plane me-1"></i> Send Request
-            </button>
-          `}
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
           <button class="btn btn-outline btn-sm justify-center" onclick="openContactModal('${donorName.replace(/'/g, "\\'")}', '${bloodGroup}', '${phone}', '${locationStr.replace(/'/g, "\\'")}')">
             <i class="fa-solid fa-phone me-1"></i> Contact Donor
           </button>
@@ -809,7 +684,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
   }
 
   const btn = document.getElementById(`btnDispatch-${donorId}`);
-  const originalHtml = btn ? btn.innerHTML : '<i class="fa-solid fa-paper-plane me-1"></i> Send Request';
+  const originalHtml = btn ? btn.innerHTML : '<i class="fa-solid fa-paper-plane me-1"></i> Dispatch Donor';
 
   // 1. Check user role first
   const me = await HemoAPI.getCurrentUser().catch(() => null);
@@ -822,31 +697,14 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
   let targetReqId = requestId || currentRequestId;
 
   if (!targetReqId) {
-    HemoUI.showToast('Requirement Required', 'Please select or create an active blood request before dispatching.', 'warning');
-    return;
-  }
+    const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
+    const recipientGroup = document.getElementById('matchRecipientGroup')?.value || bloodGroup || 'O+';
+    const radius = parseFloat(document.getElementById('matchRadius')?.value || '15');
 
-  try {
-    // 2. Enter sending state
-    if (btn) {
-      btn.disabled = true;
-<<<<<<< HEAD
-      btn.className = 'btn btn-primary btn-sm justify-center';
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
-=======
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
-    }
-
-    let targetReqId = requestId || currentRequestId;
-
-    if (!targetReqId) {
-      const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
-      const recipientGroup = document.getElementById('matchRecipientGroup')?.value || 'A+';
-      const radius = parseFloat(document.getElementById('matchRadius')?.value || '15');
-
+    try {
       const createRes = await HemoAPI.createBloodRequest({
         required_blood_group: recipientGroup,
-        hospital_name: `${selectedCity} Regional Triage Center`,
+        hospital_name: `${selectedCity} Regional Emergency Center`,
         location: selectedCity,
         urgency: 'URGENT',
         required_units: 1,
@@ -856,10 +714,23 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
       if (createRes && createRes.success && createRes.request) {
         targetReqId = createRes.request.id;
         currentRequestId = targetReqId;
-      } else {
-        throw new Error(createRes.error || 'Failed to initialize requirement for dispatch.');
       }
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
+    } catch (e) {
+      console.warn('Auto-create blood request failed:', e);
+    }
+  }
+
+  if (!targetReqId) {
+    HemoUI.showToast('Requirement Required', 'Please select or create an active blood request before dispatching.', 'warning');
+    return;
+  }
+
+  try {
+    // 2. Enter sending state
+    if (btn) {
+      btn.disabled = true;
+      btn.className = 'btn btn-primary btn-sm justify-center';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Dispatching...';
     }
 
     // 3. Dispatch via real backend API
@@ -867,18 +738,26 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
     if (response && response.success) {
       alreadyContactedDonorIds.add(donorId);
-<<<<<<< HEAD
-      
+
       const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
       if (matchItem) {
         matchItem.is_already_contacted = true;
         matchItem.contact_status = response.status || 'PENDING';
       }
-=======
-      alreadyContactedDonorIds.add(parseInt(donorId, 10));
-      const candidateObj = cachedMatches.find(m => (m.user_id || m.donor_id || m.id) == donorId);
-      if (candidateObj) candidateObj.is_already_contacted = true;
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
+
+      // Record live activity in session storage
+      try {
+        const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
+        acts.unshift({
+          type: 'DISPATCH',
+          title: '✓ Donor Dispatch Confirmed',
+          desc: `${donorName} — ${bloodGroup || 'A+'} donor request dispatched`,
+          timestamp: new Date().toISOString(),
+          iconClass: 'activity-icon-success',
+          icon: 'fa-paper-plane'
+        });
+        sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
+      } catch (e) {}
 
       if (btn) {
         btn.className = 'btn btn-success btn-sm justify-center';
@@ -888,11 +767,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
       HemoUI.showToast(
         '✓ Request Dispatched',
-<<<<<<< HEAD
-        response.message || `Donation request sent to ${donorName}. Status: PENDING response.`,
-=======
-        response.message || `Donor request sent successfully to ${donorName}. Status: PENDING response.`,
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
+        response.message || `Donation request dispatched to ${donorName}. Status: PENDING response.`,
         'success'
       );
       return;
@@ -901,7 +776,6 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
     console.error('Error dispatching donor request:', error);
     if (btn) {
       if (error.status === 409) {
-<<<<<<< HEAD
         // Backend confirms duplicate / already dispatched
         alreadyContactedDonorIds.add(donorId);
         const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
@@ -918,26 +792,11 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         btn.className = 'btn btn-primary btn-sm justify-center';
         btn.innerHTML = originalHtml;
         HemoUI.showToast('Permission Denied', error.message || 'Dispatch requires a patient account.', 'error');
-=======
-        alreadyContactedDonorIds.add(donorId);
-        alreadyContactedDonorIds.add(parseInt(donorId, 10));
-        const candidateObj = cachedMatches.find(m => (m.user_id || m.donor_id || m.id) == donorId);
-        if (candidateObj) candidateObj.is_already_contacted = true;
-
-        btn.className = 'btn btn-success btn-sm justify-center';
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched';
-        HemoUI.showToast('✓ Request Dispatched', error.message || 'Request already sent to this donor.', 'info');
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
       } else {
         btn.disabled = false;
         btn.className = 'btn btn-primary btn-sm justify-center';
         btn.innerHTML = originalHtml;
-<<<<<<< HEAD
         HemoUI.showToast('Dispatch Failed', error.message || 'Could not complete dispatch.', 'error');
-=======
-        HemoUI.showToast('Dispatch Failed', error.message || 'Could not dispatch to donor.', 'error');
->>>>>>> f5af7e9 (Fix Code-Red false dispatch and blank requirement form)
       }
     }
   }

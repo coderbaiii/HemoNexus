@@ -626,13 +626,19 @@ def request_create():
 @app.route('/matching')
 @app.route('/search')
 @app.route('/match.html')
+@app.route('/dispatch')
+@app.route('/dispatch-route')
+@app.route('/dispatch_route')
+@app.route('/dispatch.html')
+@app.route('/dispatch/route')
 def matching():
     pre_group = request.args.get('group', '')
     pre_comp = request.args.get('component', '')
+    active_page = 'dispatch' if 'dispatch' in request.path else 'match'
     return render_template(
         'matching.html',
         is_public_page=False,
-        active_page='match',
+        active_page=active_page,
         pre_group=pre_group,
         pre_comp=pre_comp
     )
@@ -640,7 +646,12 @@ def matching():
 
 @app.route('/emergency')
 @app.route('/sos')
+@app.route('/emergency-sos')
+@app.route('/emergency_sos')
+@app.route('/emergencysos')
 @app.route('/emergency.html')
+@app.route('/code-red')
+@app.route('/code_red')
 def emergency():
     return render_template(
         'emergency.html',

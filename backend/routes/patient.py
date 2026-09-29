@@ -236,6 +236,7 @@ def get_matches_for_request(request_id):
     }), 200
 
 @patient_bp.route("/api/patient/blood-requests/<int:request_id>/send-request", methods=["POST"])
+@patient_bp.route("/api/patient/blood-requests/<int:request_id>/dispatch", methods=["POST"])
 @role_required("patient")
 def send_donor_request(request_id):
     """
