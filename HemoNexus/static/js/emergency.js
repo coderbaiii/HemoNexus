@@ -1,6 +1,6 @@
 /**
  * HemoNexus Code-Red Emergency Broadcast Engine
- * Integrates real-time SOS blood request registration, heuristic matching, and direct donor dispatching.
+ * Integrates real-time SOS blood request registration, heuristic matching, direct donor dispatching, and live status polling.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,7 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 let broadcastInterval = null;
+let pollInterval = null;
 let secondsRemaining = 600; // 10 minutes emergency window
+let activeEmergencyRequestId = null;
 
 const startEmergencyBroadcast = async () => {
   const broadcastBtn = document.getElementById('btnTriggerBroadcast');
@@ -27,16 +29,22 @@ const startEmergencyBroadcast = async () => {
   const responseFeed = document.getElementById('emergencyResponseList');
 
   const originalBtnHtml = broadcastBtn ? broadcastBtn.innerHTML : '<i class="fa-solid fa-satellite-dish"></i> Transmit Code-Red Broadcast Now';
+
+  // 1. Role verification
+  const me = await HemoAPI.getCurrentUser().catch(() => null);
+  const userRole = me && me.user ? me.user.role : null;
+  if (userRole && userRole !== 'patient' && userRole !== 'admin') {
+    HemoUI.showToast('Authorization Notice', 'Emergency broadcast requires a patient account.', 'warning');
+    return;
+  }
+
   if (broadcastBtn) {
     broadcastBtn.disabled = true;
     broadcastBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Initializing Code-Red Network...';
   }
 
   try {
-    let emergencyReqId = null;
-    let matches = [];
-
-    // 1. Attempt to create Real Emergency Blood Request on Backend
+    // 2. Create Real Emergency Blood Request on Backend
     const reqPayload = {
       required_blood_group: bloodGroup,
       hospital_name: 'Lilavati Hospital & Research Centre, ICU Trauma',
@@ -48,51 +56,23 @@ const startEmergencyBroadcast = async () => {
       preferred_max_distance: radius
     };
 
-    const createRes = await HemoAPI.createBloodRequest(reqPayload).catch(() => null);
-    if (createRes && createRes.success && createRes.request) {
-      emergencyReqId = createRes.request.id;
-      // Fetch backend matches
-      const matchRes = await HemoAPI.getRequestMatches(emergencyReqId).catch(() => null);
-      if (matchRes && matchRes.success && Array.isArray(matchRes.matches)) {
-        matches = matchRes.matches;
-      }
+    const createRes = await HemoAPI.createBloodRequest(reqPayload);
+    if (!createRes || !createRes.success || !createRes.request) {
+      throw new Error(createRes?.error || 'Failed to initialize emergency blood request on server.');
     }
 
-    // If no backend matches or exploratory mode, use directory donors matching ABO/Rh compatibility
-    if (matches.length === 0) {
-      const COMPATIBILITY_RULES = {
-        'O-': ['O-'],
-        'O+': ['O-', 'O+'],
-        'A-': ['A-', 'O-'],
-        'A+': ['A+', 'A-', 'O+', 'O-'],
-        'B-': ['B-', 'O-'],
-        'B+': ['B+', 'B-', 'O+', 'O-'],
-        'AB-': ['AB-', 'A-', 'B-', 'O-'],
-        'AB+': ['AB+', 'AB-', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-']
-      };
-      const allowed = COMPATIBILITY_RULES[bloodGroup] || [bloodGroup, 'O-'];
-      const DEFAULT_EMERGENCY_DONORS = [
-        { id: 101, donor_id: 101, user_id: 101, full_name: 'Aarav Sharma', blood_group: 'O-', distance_km: 2.4, match_score: 96, phone: '+91 98765 43210', masked_location: 'Park Street, Kolkata' },
-        { id: 9, donor_id: 9, user_id: 13, full_name: 'Kallol Chatterjee', blood_group: 'O-', distance_km: 6.8, match_score: 95, phone: '+91 98377 88990', masked_location: 'Behala, Kolkata' },
-        { id: 102, donor_id: 102, user_id: 102, full_name: 'Pooja Nair', blood_group: 'A+', distance_km: 4.1, match_score: 94, phone: '+91 98123 45678', masked_location: 'Salt Lake Sector V, Kolkata' },
-        { id: 1, donor_id: 1, user_id: 5, full_name: 'Amitav Sengupta', blood_group: 'O+', distance_km: 3.2, match_score: 98, phone: '+91 98300 11223', masked_location: 'Sector 5, Salt Lake, Kolkata' },
-        { id: 3, donor_id: 3, user_id: 7, full_name: 'Subhashish Bose', blood_group: 'A+', distance_km: 5.2, match_score: 89, phone: '+91 98311 55667', masked_location: 'New Town Action Area 1, Kolkata' },
-        { id: 4, donor_id: 4, user_id: 8, full_name: 'Debolina Banerjee', blood_group: 'B+', distance_km: 2.1, match_score: 100, phone: '+91 98333 44556', masked_location: 'Sector 1, Salt Lake, Kolkata' },
-        { id: 104, donor_id: 104, user_id: 104, full_name: 'Ananya Roy', blood_group: 'A-', distance_km: 3.2, match_score: 92, phone: '+91 98300 11223', masked_location: 'Gariahat, Kolkata' }
-      ];
-      matches = DEFAULT_EMERGENCY_DONORS.filter(d => allowed.includes(d.blood_group) && d.distance_km <= radius);
-    }
+    activeEmergencyRequestId = createRes.request.id;
 
     if (broadcastTrigger) broadcastTrigger.classList.add('d-none');
     if (broadcastStatus) broadcastStatus.classList.remove('d-none');
 
     HemoUI.showToast(
       '🚨 Code-Red Broadcast Transmitted',
-      `Emergency requirement for ${bloodGroup} (${component}) blasted across SMS & mobile push channels.`,
+      `Emergency requirement #${activeEmergencyRequestId} for ${bloodGroup} (${component}) broadcast across donor network.`,
       'error'
     );
 
-    // Start 10-min countdown timer
+    // 3. Start 10-min countdown timer
     const timerEl = document.getElementById('emergencyTimer');
     if (timerEl) {
       clearInterval(broadcastInterval);
@@ -101,6 +81,7 @@ const startEmergencyBroadcast = async () => {
         secondsRemaining--;
         if (secondsRemaining <= 0) {
           clearInterval(broadcastInterval);
+          clearInterval(pollInterval);
           timerEl.textContent = '00:00';
           return;
         }
@@ -110,6 +91,10 @@ const startEmergencyBroadcast = async () => {
       }, 1000);
     }
 
+    // 4. Fetch Real Matching Candidates from Backend
+    const matchRes = await HemoAPI.getRequestMatches(activeEmergencyRequestId);
+    const matches = (matchRes && matchRes.success && Array.isArray(matchRes.matches)) ? matchRes.matches : [];
+
     if (responseFeed) responseFeed.innerHTML = '';
 
     if (matches.length === 0) {
@@ -117,54 +102,58 @@ const startEmergencyBroadcast = async () => {
         responseFeed.innerHTML = `
           <div class="empty-state py-4 text-center">
             <div class="empty-state-icon mb-2"><i class="fa-solid fa-satellite-dish text-warning fa-2x animate-pulse-sos"></i></div>
-            <h5 class="fw-bold text-slate-900">Broadcast Transmitted — Searching Perimeter</h5>
-            <p class="text-xs text-muted">Active broadcast alert is seeking compatible donors within ${radius} km.</p>
+            <h5 class="fw-bold text-slate-900">Broadcast Transmitted — Zero Immediate Donors</h5>
+            <p class="text-xs text-muted">No registered donors within ${radius} km perimeter. Request #${activeEmergencyRequestId} remains active in matching pipeline.</p>
           </div>
         `;
       }
       return;
     }
 
-    let dispatchedCount = 0;
-    // Dispatch to matching donors
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
+    // 5. Render Real Match Cards and Dispatch
+    matches.forEach(match => {
       const donorUserId = match.user_id || match.donor_id || match.id;
       const donorName = match.full_name || match.name || 'Verified Donor';
+      const donorBg = match.blood_group || bloodGroup;
+      const dist = match.distance_km != null ? match.distance_km : radius;
+      const matchScore = match.match_score || 95;
 
-      if (emergencyReqId) {
-        try {
-          await HemoAPI.sendDonorRequest(emergencyReqId, donorUserId);
-        } catch (e) {}
-      }
-
-      dispatchedCount++;
-      if (responseCountEl) responseCountEl.textContent = dispatchedCount;
-
-      const item = document.createElement('div');
-      item.className = 'match-candidate-card animate-fade-in p-3 mb-2 border rounded-3 bg-white shadow-sm';
-      item.innerHTML = `
+      const card = document.createElement('div');
+      card.id = `emergencyDonorCard-${donorUserId}`;
+      card.className = 'match-candidate-card animate-fade-in p-3 mb-2 border rounded-3 bg-white shadow-sm';
+      card.innerHTML = `
         <div class="d-flex align-center justify-between flex-wrap gap-2">
           <div class="d-flex align-center gap-3">
-            <div class="blood-badge blood-badge-solid">${match.blood_group || bloodGroup}</div>
+            <div class="blood-badge blood-badge-solid">${donorBg}</div>
             <div>
               <div class="d-flex align-center gap-2">
                 <span class="fw-bold text-slate-900">${donorName}</span>
-                <span class="badge badge-success"><i class="fa-solid fa-satellite-dish"></i> Dispatched (${match.match_score || 95}% Match)</span>
+                <span class="badge badge-success"><i class="fa-solid fa-crosshairs"></i> ${matchScore}% Match</span>
               </div>
               <div class="text-xs text-muted mt-1">
-                <i class="fa-solid fa-location-dot text-primary"></i> ${match.masked_location || 'Kolkata Region'} • ${match.distance_km || radius} km away
+                <i class="fa-solid fa-location-dot text-primary"></i> ${match.masked_location || 'Kolkata Region'} • ${dist} km away
               </div>
             </div>
           </div>
-          <div class="d-flex align-center gap-2">
-            ${match.phone ? `<a href="tel:${match.phone}" class="btn btn-outline btn-sm"><i class="fa-solid fa-phone"></i> Call</a>` : ''}
-            <span class="badge badge-teal"><i class="fa-solid fa-clock"></i> Alert Sent</span>
+          <div class="d-flex align-center gap-2" id="emergencyActions-${donorUserId}">
+            <button class="btn btn-emergency btn-sm" id="btnEmergencyDispatch-${donorUserId}" onclick="dispatchEmergencySingleDonor(${activeEmergencyRequestId}, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}')">
+              <i class="fa-solid fa-paper-plane me-1"></i> Dispatch Now
+            </button>
           </div>
         </div>
       `;
-      if (responseFeed) responseFeed.appendChild(item);
+      if (responseFeed) responseFeed.appendChild(card);
+    });
+
+    // Auto-dispatch all matching candidates for Code-Red SOS
+    for (const match of matches) {
+      const donorUserId = match.user_id || match.donor_id || match.id;
+      const donorName = match.full_name || match.name || 'Verified Donor';
+      await dispatchEmergencySingleDonor(activeEmergencyRequestId, donorUserId, donorName);
     }
+
+    // 6. Start Real Live Response Polling
+    startEmergencyResponsePolling(activeEmergencyRequestId);
 
   } catch (err) {
     console.error('Error during emergency broadcast:', err);
@@ -172,6 +161,91 @@ const startEmergencyBroadcast = async () => {
       broadcastBtn.disabled = false;
       broadcastBtn.innerHTML = originalBtnHtml;
     }
-    HemoUI.showToast('Broadcast Notice', err.message || 'Could not initiate emergency broadcast.', 'error');
+    HemoUI.showToast('Broadcast Failed', err.message || 'Could not initiate emergency broadcast.', 'error');
   }
 };
+
+const dispatchEmergencySingleDonor = async (requestId, donorUserId, donorName) => {
+  const btn = document.getElementById(`btnEmergencyDispatch-${donorUserId}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+  }
+
+  try {
+    const res = await HemoAPI.sendDonorRequest(requestId, donorUserId);
+    if (res && res.success) {
+      if (btn) {
+        btn.className = 'btn btn-success btn-sm';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched';
+      }
+      const actions = document.getElementById(`emergencyActions-${donorUserId}`);
+      if (actions && !document.getElementById(`statusBadge-${donorUserId}`)) {
+        const statusSpan = document.createElement('span');
+        statusSpan.id = `statusBadge-${donorUserId}`;
+        statusSpan.className = 'badge badge-teal ms-1';
+        statusSpan.innerHTML = '<i class="fa-solid fa-clock me-1"></i> PENDING';
+        actions.appendChild(statusSpan);
+      }
+    }
+  } catch (err) {
+    if (err && err.status === 409) {
+      if (btn) {
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i> Already Dispatched';
+      }
+    } else {
+      if (btn) {
+        btn.disabled = false;
+        btn.className = 'btn btn-emergency btn-sm';
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Dispatch Now';
+      }
+      console.warn(`Could not dispatch to donor ${donorUserId}:`, err);
+    }
+  }
+};
+
+const startEmergencyResponsePolling = (requestId) => {
+  clearInterval(pollInterval);
+  const responseCountEl = document.getElementById('liveResponseCount');
+
+  pollInterval = setInterval(async () => {
+    try {
+      const details = await HemoAPI.getRequestDetails(requestId).catch(() => null);
+      if (!details || !details.success || !Array.isArray(details.responses)) return;
+
+      let acceptedCount = 0;
+      details.responses.forEach(resp => {
+        const donorId = resp.donor_id || resp.user_id;
+        const statusBadge = document.getElementById(`statusBadge-${donorId}`);
+        const status = (resp.status || 'PENDING').toUpperCase();
+
+        if (status === 'ACCEPTED') {
+          acceptedCount++;
+          if (statusBadge) {
+            statusBadge.className = 'badge badge-success ms-1';
+            statusBadge.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> ACCEPTED';
+          }
+        } else if (status === 'REJECTED') {
+          if (statusBadge) {
+            statusBadge.className = 'badge badge-danger ms-1';
+            statusBadge.innerHTML = '<i class="fa-solid fa-circle-xmark me-1"></i> DECLINED';
+          }
+        }
+      });
+
+      if (responseCountEl) {
+        responseCountEl.textContent = acceptedCount;
+      }
+    } catch (e) {
+      console.warn('Emergency polling error:', e);
+    }
+  }, 3500);
+};
+
+window.addEventListener('beforeunload', () => {
+  clearInterval(broadcastInterval);
+  clearInterval(pollInterval);
+});

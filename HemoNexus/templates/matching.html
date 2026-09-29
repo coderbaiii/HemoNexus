@@ -676,76 +676,39 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
   const btn = document.getElementById(`btnDispatch-${donorId}`);
   const originalHtml = btn ? btn.innerHTML : '<i class="fa-solid fa-paper-plane me-1"></i> Send Request';
 
+  // 1. Check user role first
+  const me = await HemoAPI.getCurrentUser().catch(() => null);
+  const userRole = me && me.user ? me.user.role : null;
+  if (userRole && userRole !== 'patient' && userRole !== 'admin') {
+    HemoUI.showToast('Authorization Notice', 'Dispatch requires a patient account.', 'warning');
+    return;
+  }
+
+  let targetReqId = requestId || currentRequestId;
+
+  if (!targetReqId) {
+    HemoUI.showToast('Requirement Required', 'Please select or create an active blood request before dispatching.', 'warning');
+    return;
+  }
+
   try {
-    // 1. Enter sending state
+    // 2. Enter sending state
     if (btn) {
       btn.disabled = true;
       btn.className = 'btn btn-primary btn-sm justify-center';
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
     }
 
-    let targetReqId = requestId || currentRequestId;
+    // 3. Dispatch via real backend API
+    const response = await HemoAPI.sendDonorRequest(targetReqId, donorId);
 
-    if (!targetReqId) {
-      try {
-        const me = await HemoAPI.getCurrentUser().catch(() => null);
-        if (me && me.user && me.user.role === 'patient') {
-          const newReqRes = await HemoAPI.createBloodRequest({
-            required_blood_group: bloodGroup || 'A+',
-            hospital_name: 'Apollo Multispecialty Hospital Kolkata',
-            urgency: 'URGENT',
-            required_units: 1,
-            location: 'Kolkata',
-            latitude: 22.5697,
-            longitude: 88.4046
-          });
-          if (newReqRes && newReqRes.success && newReqRes.request) {
-            targetReqId = newReqRes.request.id;
-            currentRequestId = targetReqId;
-          }
-        }
-      } catch (e) {
-        console.warn('Could not auto-create request for dispatch:', e);
-      }
-    }
-
-    if (targetReqId) {
-      // Dispatch via real backend API
-      const response = await HemoAPI.sendDonorRequest(targetReqId, donorId).catch(err => {
-        if (err && err.status === 409) throw err;
-        return { success: true, message: `Emergency blood dispatch notification sent to ${donorName}. Status: PENDING response.` };
-      });
-
-      if (response && response.success) {
-        alreadyContactedDonorIds.add(donorId);
-        
-        const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
-        if (matchItem) {
-          matchItem.is_already_contacted = true;
-          matchItem.contact_status = response.status || 'PENDING';
-        }
-
-        if (btn) {
-          btn.className = 'btn btn-success btn-sm justify-center';
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched';
-        }
-
-        HemoUI.showToast(
-          '✓ Request Dispatched',
-          response.message || `Donation request sent to ${donorName}. Status: PENDING response.`,
-          'success'
-        );
-        return;
-      }
-    } else {
-      // Direct dispatch state
+    if (response && response.success) {
       alreadyContactedDonorIds.add(donorId);
       
       const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
       if (matchItem) {
         matchItem.is_already_contacted = true;
-        matchItem.contact_status = 'PENDING';
+        matchItem.contact_status = response.status || 'PENDING';
       }
 
       if (btn) {
@@ -756,9 +719,10 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
       HemoUI.showToast(
         '✓ Request Dispatched',
-        `Emergency blood dispatch notification sent to ${donorName} (${bloodGroup || 'A+'}). Hospital triage informed.`,
+        response.message || `Donation request sent to ${donorName}. Status: PENDING response.`,
         'success'
       );
+      return;
     }
   } catch (error) {
     console.error('Error dispatching donor request:', error);
@@ -775,12 +739,16 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i> Already Dispatched';
         HemoUI.showToast('Already Dispatched', error.message || 'A donation request has already been sent to this donor.', 'warning');
-      } else {
-        // Real failure: restore button and show backend error
+      } else if (error.status === 403) {
         btn.disabled = false;
         btn.className = 'btn btn-primary btn-sm justify-center';
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Send Request';
-        HemoUI.showToast('Dispatch Notice', error.message || 'Could not complete dispatch.', 'error');
+        btn.innerHTML = originalHtml;
+        HemoUI.showToast('Permission Denied', error.message || 'Dispatch requires a patient account.', 'error');
+      } else {
+        btn.disabled = false;
+        btn.className = 'btn btn-primary btn-sm justify-center';
+        btn.innerHTML = originalHtml;
+        HemoUI.showToast('Dispatch Failed', error.message || 'Could not complete dispatch.', 'error');
       }
     }
   }
