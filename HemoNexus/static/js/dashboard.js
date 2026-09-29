@@ -41,36 +41,38 @@ const initDashboardData = async () => {
     requestAnimationFrame(update);
   };
 
+  // Helper for human-readable relative timestamp
+  const formatRelativeTime = (isoString) => {
+    if (!isoString) return 'Just now';
+    try {
+      const past = new Date(isoString).getTime();
+      if (isNaN(past)) return 'Just now';
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - past) / 1000));
+      if (diffSec < 60) return 'Just now';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? '' : 's'} ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? '' : 's'} ago`;
+      const diffDay = Math.floor(diffHr / 24);
+      return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+    } catch (e) {
+      return 'Just now';
+    }
+  };
+
   try {
     // 1. Fetch current session & user role
     const meRes = await HemoAPI.getCurrentUser().catch(() => null);
     const userRole = meRes && meRes.user ? meRes.user.role : 'patient';
 
     let requestsList = [];
-    // Helper for human-readable relative timestamp
-    const formatRelativeTime = (isoString) => {
-      if (!isoString) return 'Just now';
-      const now = new Date();
-      const past = new Date(isoString);
-      const diffSec = Math.floor((now - past) / 1000);
-      if (diffSec < 60) return 'Just now';
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? '' : 's'} ago`;
-      const diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? '' : 's'} ago`;
-      return past.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    // 1. Fetch current session & user role
-    const meRes = await HemoAPI.getCurrentUser().catch(() => null);
-    const userRole = meRes && meRes.user ? meRes.user.role : 'patient';
-
-    let requestsList = [];
     let donorRequestsList = [];
+    let dispatchResponses = [];
     let availableDonorsCount = 10;
     let fulfilledCount = 0;
 
-    // 2. Fetch admin stats, patient requests, or donor requests
+    // 2. Fetch real data from backend endpoints based on user role
     if (userRole === 'admin') {
       const statsRes = await HemoAPI.getAdminStats().catch(() => null);
       if (statsRes && statsRes.success && statsRes.stats) {
@@ -78,23 +80,48 @@ const initDashboardData = async () => {
         fulfilledCount = statsRes.stats.fulfilled_blood_requests || 0;
       }
       const allReqRes = await HemoAPI.getAdminRequests().catch(() => null);
-      if (allReqRes && allReqRes.success && Array.isArray(allReqRes.blood_requests)) {
-        requestsList = allReqRes.blood_requests;
+      if (allReqRes && allReqRes.success && Array.isArray(allReqRes.requests)) {
+        requestsList = allReqRes.requests;
       }
-    }
-
-    if (userRole === 'donor') {
+      const adminRespRes = await HemoAPI.getAdminResponses().catch(() => null);
+      if (adminRespRes && adminRespRes.success && Array.isArray(adminRespRes.responses)) {
+        dispatchResponses = adminRespRes.responses;
+      }
+    } else if (userRole === 'donor') {
       const donorReqRes = await HemoAPI.getDonorRequests().catch(() => null);
       if (donorReqRes && donorReqRes.success && Array.isArray(donorReqRes.requests)) {
         donorRequestsList = donorReqRes.requests;
       }
-    }
-
-    if (requestsList.length === 0) {
       const patReqRes = await HemoAPI.getPatientRequests().catch(() => null);
       if (patReqRes && patReqRes.success && Array.isArray(patReqRes.requests)) {
         requestsList = patReqRes.requests;
       }
+    } else {
+      // Patient role
+      const patReqRes = await HemoAPI.getPatientRequests().catch(() => null);
+      if (patReqRes && patReqRes.success && Array.isArray(patReqRes.requests)) {
+        requestsList = patReqRes.requests;
+      }
+    }
+
+    // Fetch individual request details for patient requests to retrieve real dispatch responses
+    if (requestsList.length > 0 && dispatchResponses.length === 0) {
+      await Promise.all(requestsList.slice(0, 10).map(async (req) => {
+        try {
+          const details = await HemoAPI.getRequestDetails(req.id).catch(() => null);
+          if (details && details.success && Array.isArray(details.responses)) {
+            details.responses.forEach(resp => {
+              dispatchResponses.push({
+                ...resp,
+                blood_request_id: req.id,
+                hospital_name: req.hospital_name,
+                required_blood_group: req.required_blood_group,
+                patient_name: meRes && meRes.user ? meRes.user.full_name : 'Patient'
+              });
+            });
+          }
+        } catch (e) {}
+      }));
     }
 
     // 3. Compute Real Metrics
@@ -111,8 +138,8 @@ const initDashboardData = async () => {
 
     // 4. Animate Metric Counters
     animateValue(countDonorsEl, availableDonorsCount);
-    animateValue(countRequestsEl, activeRequests > 0 ? activeRequests : 2);
-    animateValue(countCriticalEl, criticalRequests > 0 ? criticalRequests : 1);
+    animateValue(countRequestsEl, activeRequests > 0 ? activeRequests : requestsList.length);
+    animateValue(countCriticalEl, criticalRequests);
     animateValue(countFulfilledEl, fulfilledCount);
 
     // 5. Render Priority Blood Requests Pipeline Table
@@ -121,7 +148,7 @@ const initDashboardData = async () => {
       if (displayList.length > 0) {
         tableBody.innerHTML = displayList.slice(0, 8).map(req => {
           const bloodGroup = req.required_blood_group || req.bloodGroup || 'O+';
-          const hospital = req.hospital_name || req.hospital || 'Lilavati Hospital & Research Centre';
+          const hospital = req.hospital_name || req.hospital || 'Hospital';
           const patientName = req.patient_name || req.patientName || `Patient #${req.patient_id || req.id}`;
           const unitsNeeded = req.required_units || req.unitsNeeded || 1;
           const totalSent = req.total_sent || (req.response_status ? 1 : 0);
@@ -178,73 +205,106 @@ const initDashboardData = async () => {
       }
     }
 
-    // 6. Build and Render Live Recent Activity Feed
+    // 6. Build and Render Live Recent Activity Feed from Real Backend Records
     if (activityList) {
       const feedItems = [];
 
-      // A. Load session recorded live dispatch & SOS events
-      try {
-        const sessionActs = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
-        if (Array.isArray(sessionActs)) {
-          sessionActs.forEach(act => {
-            feedItems.push({
-              title: act.title,
-              desc: act.desc,
-              time: formatRelativeTime(act.timestamp),
-              timestamp: new Date(act.timestamp).getTime(),
-              iconClass: act.iconClass || 'activity-icon-success',
-              icon: act.icon || 'fa-paper-plane'
-            });
-          });
-        }
-      } catch (e) {}
-
-      // B. Load live backend request activities
-      const displayRequests = requestsList.length > 0 ? requestsList : donorRequestsList;
-      displayRequests.forEach(req => {
-        const bg = req.required_blood_group || 'O+';
-        const hosp = req.hospital_name || 'Hospital';
-        const sent = req.total_sent || 0;
-        const accepted = req.accepted_count || 0;
-        const rawTime = req.created_at || req.requested_at;
-        const timeFormatted = formatRelativeTime(rawTime);
+      // A. Real Dispatches & Responses from database (donor_request_responses)
+      dispatchResponses.forEach(r => {
+        const reqId = r.blood_request_id || r.request_id || '';
+        const donorName = r.donor_name || 'Verified Donor';
+        const bloodGroup = r.donor_blood_group || r.required_blood_group || 'A+';
+        const hospital = r.hospital_name || 'Hospital';
+        const status = (r.status || r.response_status || 'PENDING').toUpperCase();
+        const rawTime = r.response_time || r.created_at || r.requested_at;
         const timeEpoch = rawTime ? new Date(rawTime).getTime() : Date.now();
 
-        if (accepted > 0) {
+        if (status === 'ACCEPTED') {
           feedItems.push({
-            title: `Donation Accepted for #${req.id || req.blood_request_id}`,
-            desc: `Matched donor accepted invitation for ${bg} at ${hosp}`,
-            time: timeFormatted,
+            title: 'Donor Dispatch Confirmed',
+            desc: `${donorName} accepted emergency request #REQ-${reqId} for ${hospital}.`,
+            time: formatRelativeTime(rawTime),
             timestamp: timeEpoch,
             iconClass: 'activity-icon-success',
-            icon: 'fa-user-check'
+            icon: 'fa-circle-check'
           });
-        }
-        if (sent > 0) {
+        } else if (status === 'PENDING') {
           feedItems.push({
-            title: `Donor Request Dispatched for #${req.id || req.blood_request_id}`,
-            desc: `Dispatched to ${sent} compatible nearby donor(s)`,
-            time: timeFormatted,
+            title: 'Donor Dispatch Confirmed',
+            desc: `${donorName} — ${bloodGroup} donor request dispatched for #REQ-${reqId} (${hospital})`,
+            time: formatRelativeTime(rawTime),
             timestamp: timeEpoch,
-            iconClass: 'activity-icon-warning',
+            iconClass: 'activity-icon-success',
             icon: 'fa-paper-plane'
           });
+        } else if (status === 'REJECTED') {
+          feedItems.push({
+            title: 'Donor Response Recorded',
+            desc: `${donorName} unavailable for request #REQ-${reqId}`,
+            time: formatRelativeTime(rawTime),
+            timestamp: timeEpoch,
+            iconClass: 'activity-icon-warning',
+            icon: 'fa-circle-xmark'
+          });
         }
-        feedItems.push({
-          title: `Blood Request #${req.id || req.blood_request_id} Registered`,
-          desc: `${bg} Whole Blood requirement for ${hosp}`,
-          time: timeFormatted,
-          timestamp: timeEpoch,
-          iconClass: 'activity-icon-primary',
-          icon: 'fa-file-medical'
-        });
       });
 
-      // Sort by newest timestamp first
+      // B. For donors viewing incoming dispatches
+      if (userRole === 'donor' && donorRequestsList.length > 0) {
+        donorRequestsList.forEach(dr => {
+          const rawTime = dr.response_time || dr.requested_at;
+          const timeEpoch = rawTime ? new Date(rawTime).getTime() : Date.now();
+          const isAccepted = dr.response_status === 'ACCEPTED';
+
+          feedItems.push({
+            title: isAccepted ? 'Donation Accepted & Confirmed' : 'Donor Dispatch Received',
+            desc: `${isAccepted ? 'You accepted emergency requirement' : 'Emergency invitation received'} for ${dr.required_blood_group} at ${dr.hospital_name}`,
+            time: formatRelativeTime(rawTime),
+            timestamp: timeEpoch,
+            iconClass: isAccepted ? 'activity-icon-success' : 'activity-icon-primary',
+            icon: isAccepted ? 'fa-circle-check' : 'fa-truck-medical'
+          });
+        });
+      }
+
+      // C. Real Blood Requests from database (blood_requests)
+      requestsList.forEach(req => {
+        const reqId = req.id || req.blood_request_id || '';
+        const bloodGroup = req.required_blood_group || 'O+';
+        const hospital = req.hospital_name || 'Hospital';
+        const rawTime = req.created_at;
+        const timeEpoch = rawTime ? new Date(rawTime).getTime() : Date.now();
+        const urgency = (req.urgency || '').toUpperCase();
+        const status = (req.request_status || req.status || 'OPEN').toUpperCase();
+
+        feedItems.push({
+          title: 'New Blood Request Registered',
+          desc: `${urgency === 'CRITICAL' ? 'Emergency ' : ''}${bloodGroup} requirement #REQ-${reqId} registered for ${hospital}.`,
+          time: formatRelativeTime(rawTime),
+          timestamp: timeEpoch,
+          iconClass: urgency === 'CRITICAL' ? 'activity-icon-danger' : 'activity-icon-primary',
+          icon: 'fa-droplet'
+        });
+
+        if (status === 'FULFILLED') {
+          const fulfilledTime = req.updated_at || req.created_at;
+          feedItems.push({
+            title: 'Donation Completed & Verified',
+            desc: `Request #REQ-${reqId} fulfilled for ${hospital} with ${req.required_units || 1} unit(s) of ${bloodGroup}.`,
+            time: formatRelativeTime(fulfilledTime),
+            timestamp: fulfilledTime ? new Date(fulfilledTime).getTime() : timeEpoch,
+            iconClass: 'activity-icon-teal',
+            icon: 'fa-heart-circle-check'
+          });
+        }
+      });
+
+      // D. Sort strictly by real timestamp: newest event first
       feedItems.sort((a, b) => b.timestamp - a.timestamp);
 
+      // E. Render to DOM
       if (feedItems.length > 0) {
-        activityList.innerHTML = feedItems.slice(0, 6).map(act => `
+        activityList.innerHTML = feedItems.slice(0, 8).map(act => `
           <li class="activity-item">
             <div class="activity-icon ${act.iconClass}">
               <i class="fa-solid ${act.icon}"></i>
@@ -256,6 +316,14 @@ const initDashboardData = async () => {
             </div>
           </li>
         `).join('');
+      } else {
+        activityList.innerHTML = `
+          <li class="empty-state py-4 text-center">
+            <div class="empty-state-icon mb-2"><i class="fa-solid fa-clock-rotate-left text-muted fa-2x"></i></div>
+            <h5 class="fw-bold text-slate-900 mb-1">No Recent Activity</h5>
+            <p class="text-xs text-muted mb-0">Dispatches and donation updates will appear here in real time.</p>
+          </li>
+        `;
       }
     }
 

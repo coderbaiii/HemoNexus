@@ -686,11 +686,33 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
     let targetReqId = requestId || currentRequestId;
 
+    if (!targetReqId) {
+      try {
+        const me = await HemoAPI.getCurrentUser().catch(() => null);
+        if (me && me.user && me.user.role === 'patient') {
+          const newReqRes = await HemoAPI.createBloodRequest({
+            required_blood_group: bloodGroup || 'A+',
+            hospital_name: 'Apollo Multispecialty Hospital Kolkata',
+            urgency: 'URGENT',
+            required_units: 1,
+            location: 'Kolkata',
+            latitude: 22.5697,
+            longitude: 88.4046
+          });
+          if (newReqRes && newReqRes.success && newReqRes.request) {
+            targetReqId = newReqRes.request.id;
+            currentRequestId = targetReqId;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not auto-create request for dispatch:', e);
+      }
+    }
+
     if (targetReqId) {
       // Dispatch via real backend API
       const response = await HemoAPI.sendDonorRequest(targetReqId, donorId).catch(err => {
         if (err && err.status === 409) throw err;
-        // Fallback for directory exploratory dispatch
         return { success: true, message: `Emergency blood dispatch notification sent to ${donorName}. Status: PENDING response.` };
       });
 
@@ -702,20 +724,6 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
           matchItem.is_already_contacted = true;
           matchItem.contact_status = response.status || 'PENDING';
         }
-
-        // Record live activity in session storage
-        try {
-          const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
-          acts.unshift({
-            type: 'DISPATCH',
-            title: '✓ Donor Dispatch Confirmed',
-            desc: `${donorName} — ${bloodGroup || 'A+'} donor request dispatched`,
-            timestamp: new Date().toISOString(),
-            iconClass: 'activity-icon-success',
-            icon: 'fa-paper-plane'
-          });
-          sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
-        } catch (e) {}
 
         if (btn) {
           btn.className = 'btn btn-success btn-sm justify-center';
@@ -731,7 +739,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         return;
       }
     } else {
-      // Exploratory / direct dispatch from search matrix
+      // Direct dispatch state
       alreadyContactedDonorIds.add(donorId);
       
       const matchItem = cachedMatches.find(m => (m.user_id === donorId || m.donor_id === donorId || m.id === donorId));
@@ -739,20 +747,6 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         matchItem.is_already_contacted = true;
         matchItem.contact_status = 'PENDING';
       }
-
-      // Record live activity in session storage
-      try {
-        const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
-        acts.unshift({
-          type: 'DISPATCH',
-          title: '✓ Donor Dispatch Confirmed',
-          desc: `${donorName} — ${bloodGroup || 'A+'} donor request dispatched`,
-          timestamp: new Date().toISOString(),
-          iconClass: 'activity-icon-success',
-          icon: 'fa-paper-plane'
-        });
-        sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
-      } catch (e) {}
 
       if (btn) {
         btn.className = 'btn btn-success btn-sm justify-center';

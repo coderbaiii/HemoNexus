@@ -86,20 +86,6 @@ const startEmergencyBroadcast = async () => {
     if (broadcastTrigger) broadcastTrigger.classList.add('d-none');
     if (broadcastStatus) broadcastStatus.classList.remove('d-none');
 
-    // Record in session activity
-    try {
-      const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
-      acts.unshift({
-        type: 'SOS',
-        title: '🚨 Code-Red SOS Broadcast',
-        desc: `Critical ${bloodGroup} (${component}) broadcast to ${radius} km donor network`,
-        timestamp: new Date().toISOString(),
-        iconClass: 'activity-icon-danger',
-        icon: 'fa-radiation'
-      });
-      sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
-    } catch (e) {}
-
     HemoUI.showToast(
       '🚨 Code-Red Broadcast Transmitted',
       `Emergency requirement for ${bloodGroup} (${component}) blasted across SMS & mobile push channels.`,

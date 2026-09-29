@@ -767,6 +767,7 @@ const HemoAPI = (() => {
 
     // 6. Admin Endpoints
     getAdminStats: () => apiFetch('/api/admin/stats', { method: 'GET' }),
-    getAdminRequests: () => apiFetch('/api/admin/blood-requests', { method: 'GET' })
+    getAdminRequests: () => apiFetch('/api/admin/blood-requests', { method: 'GET' }),
+    getAdminResponses: () => apiFetch('/api/admin/responses', { method: 'GET' })
   };
 })();
