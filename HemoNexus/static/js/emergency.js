@@ -34,10 +34,13 @@ const startEmergencyBroadcast = async () => {
 
   try {
     // 1. Create Real Emergency Blood Request on Backend
+    const hospitalName = document.getElementById('emergencyHospitalName')?.value?.trim() || 'Regional Emergency Trauma Center';
+    const locationVal = document.getElementById('emergencyLocation')?.value?.trim() || 'Kolkata';
+
     const reqPayload = {
       required_blood_group: bloodGroup,
-      hospital_name: 'Lilavati Hospital & Research Centre, ICU Trauma',
-      location: 'Lilavati Hospital ICU Bay #01',
+      hospital_name: hospitalName,
+      location: locationVal,
       urgency: 'CRITICAL',
       required_units: 3,
       preferred_max_distance: radius
@@ -88,8 +91,8 @@ const startEmergencyBroadcast = async () => {
         responseFeed.innerHTML = `
           <div class="empty-state py-4 text-center">
             <div class="empty-state-icon mb-2"><i class="fa-solid fa-satellite-dish text-warning fa-2x animate-pulse-sos"></i></div>
-            <h5 class="fw-bold text-slate-900">Broadcast Transmitted — Zero Immediate Donors</h5>
-            <p class="text-xs text-muted">No donors currently within ${radius} km radius. Request #${emergencyReqId} remains active in matching pipeline for incoming availability.</p>
+            <h5 class="fw-bold text-slate-900">No donor responses yet.</h5>
+            <p class="text-xs text-muted">Broadcast transmitted. Request #${emergencyReqId} is active — waiting for compatible donors to respond.</p>
             <a href="/match?request_id=${emergencyReqId}" class="btn btn-outline-primary btn-sm mt-2">
               <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Open Match Engine
             </a>
@@ -120,28 +123,30 @@ const startEmergencyBroadcast = async () => {
               <div>
                 <div class="d-flex align-center gap-2">
                   <span class="fw-bold text-slate-900">${donorName}</span>
-                  <span class="badge badge-success"><i class="fa-solid fa-satellite-dish"></i> Dispatched (${match.match_score || 95}% Match)</span>
+                  <span class="badge badge-teal"><i class="fa-solid fa-satellite-dish"></i> Alert Sent</span>
                 </div>
                 <div class="text-xs text-muted mt-1">
                   <i class="fa-solid fa-location-dot text-primary"></i> ${match.masked_location || 'Zone'} • ${match.distance_km || radius} km away
+                </div>
+                <div class="text-xs text-muted mt-1">
+                  <i class="fa-solid fa-clock-rotate-left text-warning"></i> Awaiting donor response
                 </div>
               </div>
             </div>
             <div class="d-flex align-center gap-2">
               ${match.phone ? `<a href="tel:${match.phone}" class="btn btn-outline btn-sm"><i class="fa-solid fa-phone"></i> Call</a>` : ''}
-              <span class="badge badge-teal"><i class="fa-solid fa-clock"></i> Alert Sent</span>
             </div>
           </div>
         `;
         if (responseFeed) responseFeed.prepend(item);
 
         HemoUI.showToast(
-          'Emergency Alert Dispatched',
-          `Direct notification sent to ${donorName} (${match.blood_group || bloodGroup}).`,
+          'Emergency Alert Sent',
+          `Broadcast notification sent to ${donorName} (${match.blood_group || bloodGroup}). Awaiting response.`,
           'success'
         );
       } catch (dispatchErr) {
-        console.warn(`Could not dispatch to donor ${donorUserId}:`, dispatchErr);
+        console.warn(`Could not send alert to donor ${donorUserId}:`, dispatchErr);
       }
     }
   } catch (err) {
