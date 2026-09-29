@@ -636,7 +636,7 @@ function renderMatchedDonorsList(matches) {
     } else {
       dispatchButtonHtml = `
         <button class="btn btn-primary btn-sm justify-center" id="btnDispatch-${donorUserId}" onclick="dispatchDonorRequest(currentRequestId, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}', '${bloodGroup}')">
-          <i class="fa-solid fa-paper-plane me-1"></i> Send Request
+          <i class="fa-solid fa-paper-plane me-1"></i> Dispatch Donor
         </button>
       `;
     }
@@ -684,7 +684,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
   }
 
   const btn = document.getElementById(`btnDispatch-${donorId}`);
-  const originalHtml = btn ? btn.innerHTML : '<i class="fa-solid fa-paper-plane me-1"></i> Send Request';
+  const originalHtml = btn ? btn.innerHTML : '<i class="fa-solid fa-paper-plane me-1"></i> Dispatch Donor';
 
   // 1. Check user role first
   const me = await HemoAPI.getCurrentUser().catch(() => null);
@@ -697,6 +697,30 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
   let targetReqId = requestId || currentRequestId;
 
   if (!targetReqId) {
+    const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
+    const recipientGroup = document.getElementById('matchRecipientGroup')?.value || bloodGroup || 'O+';
+    const radius = parseFloat(document.getElementById('matchRadius')?.value || '15');
+
+    try {
+      const createRes = await HemoAPI.createBloodRequest({
+        required_blood_group: recipientGroup,
+        hospital_name: `${selectedCity} Regional Emergency Center`,
+        location: selectedCity,
+        urgency: 'URGENT',
+        required_units: 1,
+        preferred_max_distance: radius
+      });
+
+      if (createRes && createRes.success && createRes.request) {
+        targetReqId = createRes.request.id;
+        currentRequestId = targetReqId;
+      }
+    } catch (e) {
+      console.warn('Auto-create blood request failed:', e);
+    }
+  }
+
+  if (!targetReqId) {
     HemoUI.showToast('Requirement Required', 'Please select or create an active blood request before dispatching.', 'warning');
     return;
   }
@@ -706,7 +730,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
     if (btn) {
       btn.disabled = true;
       btn.className = 'btn btn-primary btn-sm justify-center';
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Dispatching...';
     }
 
     // 3. Dispatch via real backend API
@@ -721,6 +745,20 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
         matchItem.contact_status = response.status || 'PENDING';
       }
 
+      // Record live activity in session storage
+      try {
+        const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
+        acts.unshift({
+          type: 'DISPATCH',
+          title: '✓ Donor Dispatch Confirmed',
+          desc: `${donorName} — ${bloodGroup || 'A+'} donor request dispatched`,
+          timestamp: new Date().toISOString(),
+          iconClass: 'activity-icon-success',
+          icon: 'fa-paper-plane'
+        });
+        sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 20)));
+      } catch (e) {}
+
       if (btn) {
         btn.className = 'btn btn-success btn-sm justify-center';
         btn.disabled = true;
@@ -729,7 +767,7 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
 
       HemoUI.showToast(
         '✓ Request Dispatched',
-        response.message || `Donation request sent to ${donorName}. Status: PENDING response.`,
+        response.message || `Donation request dispatched to ${donorName}. Status: PENDING response.`,
         'success'
       );
       return;
