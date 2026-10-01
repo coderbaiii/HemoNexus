@@ -98,7 +98,7 @@ def test_match_all_conditions_satisfied_and_ranked(app, db_conn):
     """TC-MATCH-007: Multiple eligible donors are correctly ranked by composite score."""
     with app.app_context():
         p_user = create_user("Patient Rank", "pat.rank@example.com", "Password@123", "patient", db=db_conn)
-        req = create_blood_request(p_user["id"], "O+", "Apollo Hospital", latitude=22.5697, longitude=88.4046, preferred_max_distance=30.0, db=db_conn)
+        req = create_blood_request(p_user["id"], "O+", "Apollo Hospital", required_time="2026-10-15T12:00:00+05:30", latitude=22.5697, longitude=88.4046, preferred_max_distance=30.0, db=db_conn)
         
         matches = find_matching_donors(req["id"], db=db_conn)
         assert len(matches) >= 2
