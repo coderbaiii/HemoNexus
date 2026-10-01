@@ -99,18 +99,56 @@ const HemoAuth = (() => {
     }
   };
 
-  const handleLoginSubmit = (event) => {
+  const handleLoginSubmit = async (event) => {
+    if (event) event.preventDefault();
     const emailInput = document.getElementById('loginEmail');
     const passInput = document.getElementById('loginPassword');
-    if (emailInput && !emailInput.value.trim()) return;
-    if (passInput && !passInput.value) return;
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+    const password = passInput ? passInput.value : '';
+
+    if (!email || !password) {
+      HemoUI.showToast('Validation Error', 'Email and password are required.', 'warning');
+      return;
+    }
 
     const btn = document.getElementById('loginSubmitBtn');
+    const origHtml = btn ? btn.innerHTML : 'Sign In to Portal';
     if (btn) {
+      btn.disabled = true;
       btn.innerHTML = `
         <span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>
-        <span>Verifying Security Credentials...</span>
+        <span>Signing in...</span>
       `;
+    }
+
+    try {
+      const res = await HemoAPI.login(email, password);
+      if (res && res.success) {
+        HemoUI.showToast('Welcome Back', res.message || 'Signed in successfully.', 'success');
+        const urlParams = new URLSearchParams(window.location.search);
+        const nextUrl = urlParams.get('next') || '/dashboard';
+        window.location.href = nextUrl;
+      } else {
+        throw new Error(res.error || 'Login failed.');
+      }
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+      let errBox = document.getElementById('loginAlertBox');
+      if (!errBox) {
+        errBox = document.createElement('div');
+        errBox.id = 'loginAlertBox';
+        errBox.className = 'alert alert-danger d-flex align-items-center mb-3 py-2 px-3 rounded-3';
+        const formEl = document.getElementById('authLoginForm');
+        if (formEl) formEl.prepend(errBox);
+      }
+      errBox.innerHTML = `
+        <i class="fa-solid fa-circle-exclamation me-2 fs-5 flex-shrink-0 text-danger"></i>
+        <div><strong>Authentication Failed:</strong> ${err.message || 'Invalid email or password.'}</div>
+      `;
+      HemoUI.showToast('Login Failed', err.message || 'Invalid email or password.', 'error');
     }
   };
 
@@ -225,70 +263,13 @@ const HemoUI = (() => {
    * Professional multi-step ECG and heuristic matching sequence
    */
   const triggerMatchingSearchAnimation = (bloodGroup = 'O-', component = 'Whole Blood', cityOrUrl = null) => {
-    const modalId = 'searchMatchingModal';
-    openModal(modalId);
-
-    const steps = [
-      { id: 'step-1', text: 'Searching nearby donors...' },
-      { id: 'step-2', text: 'Checking blood compatibility...' },
-      { id: 'step-3', text: 'Checking donor availability...' },
-      { id: 'step-4', text: 'Calculating distance...' },
-      { id: 'step-5', text: 'Matching donors...' },
-      { id: 'step-6', text: 'Compatible donors found' }
-    ];
-
-    // Reset step UI
-    steps.forEach((s, idx) => {
-      const el = document.getElementById(s.id);
-      if (el) {
-        el.className = 'matching-step-item' + (idx === 0 ? ' is-active' : '');
-        const indicator = el.querySelector('.step-indicator');
-        if (indicator) {
-          indicator.innerHTML = idx === 0 ? '<i class="fa-solid fa-circle-notch fa-spin"></i>' : '<i class="fa-solid fa-circle" style="font-size: 0.5rem;"></i>';
-        }
-      }
-    });
-
-    let currentStep = 0;
-    const stepDuration = 280;
-
-    const advanceStep = () => {
-      if (currentStep < steps.length) {
-        const prevEl = document.getElementById(steps[currentStep].id);
-        if (prevEl) {
-          prevEl.classList.remove('is-active');
-          prevEl.classList.add('is-completed');
-          const indicator = prevEl.querySelector('.step-indicator');
-          if (indicator) indicator.innerHTML = '<i class="fa-solid fa-check"></i>';
-        }
-
-        currentStep++;
-
-        if (currentStep < steps.length) {
-          const nextEl = document.getElementById(steps[currentStep].id);
-          if (nextEl) {
-            nextEl.classList.add('is-active');
-            const indicator = nextEl.querySelector('.step-indicator');
-            if (indicator) indicator.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
-          }
-          setTimeout(advanceStep, stepDuration);
-        } else {
-          // All steps complete -> transition to match view
-          setTimeout(() => {
-            closeModal(modalId);
-            let target = `/match?group=${encodeURIComponent(bloodGroup)}&component=${encodeURIComponent(component)}`;
-            if (cityOrUrl && cityOrUrl.startsWith('/')) {
-              target = cityOrUrl;
-            } else if (cityOrUrl) {
-              target += `&city=${encodeURIComponent(cityOrUrl)}`;
-            }
-            window.location.href = target;
-          }, 350);
-        }
-      }
-    };
-
-    setTimeout(advanceStep, stepDuration);
+    let target = `/match?group=${encodeURIComponent(bloodGroup)}&component=${encodeURIComponent(component)}`;
+    if (cityOrUrl && cityOrUrl.startsWith('/')) {
+      target = cityOrUrl;
+    } else if (cityOrUrl) {
+      target += `&city=${encodeURIComponent(cityOrUrl)}`;
+    }
+    window.location.href = target;
   };
 
   /**
@@ -697,12 +678,12 @@ const HemoUI = (() => {
 
 /**
  * HemoNexus Unified Backend REST API Client
- * Connects frontend flows to real Flask endpoints with credentials: 'include'
+ * Connects frontend flows to real Flask endpoints with credentials: 'same-origin'
  */
 const HemoAPI = (() => {
   const apiFetch = async (url, options = {}) => {
     const config = {
-      credentials: 'include',
+      credentials: 'same-origin',
       headers: {
         'Accept': 'application/json',
         ...(options.headers || {})
@@ -733,6 +714,10 @@ const HemoAPI = (() => {
   };
 
   return {
+    // 0. Authentication
+    login: (email, password) => apiFetch('/api/login', { method: 'POST', body: { email, password } }),
+    logout: () => apiFetch('/api/logout', { method: 'POST' }),
+
     // 1. Patient Blood Requests
     createBloodRequest: (payload) => apiFetch('/api/patient/blood-requests', { method: 'POST', body: payload }),
     getPatientRequests: () => apiFetch('/api/patient/blood-requests', { method: 'GET' }),
@@ -743,10 +728,10 @@ const HemoAPI = (() => {
     // 2. Smart Matching Candidates (Real Backend Heuristic Engine)
     getRequestMatches: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/matches`, { method: 'GET' }),
 
-    // 3. Donor Dispatch / Send Request (Priority Endpoint)
-    sendDonorRequest: (requestId, donorId) => apiFetch(`/api/patient/blood-requests/${requestId}/send-request`, {
+    // 3. Donor Dispatch / Send Request (Priority Endpoint - uses user_id)
+    sendDonorRequest: (requestId, donorUserId) => apiFetch(`/api/patient/blood-requests/${requestId}/send-request`, {
       method: 'POST',
-      body: { donor_id: donorId }
+      body: { donor_id: donorUserId }
     }),
 
     // 4. Donor Inbox & Action Responses
@@ -760,10 +745,13 @@ const HemoAPI = (() => {
       body: { message }
     }),
 
-    // 5. User / Identity
+    // 5. User / Identity & Directory
     getCurrentUser: () => apiFetch('/api/me', { method: 'GET' }),
     getPatientProfile: () => apiFetch('/api/patient/profile', { method: 'GET' }),
     getDonorProfile: () => apiFetch('/api/donor/profile', { method: 'GET' }),
+    getDonors: () => apiFetch('/api/donors', { method: 'GET' }),
+    getActivities: () => apiFetch('/api/activities', { method: 'GET' }),
+    getDispatches: () => apiFetch('/api/dispatches', { method: 'GET' }),
 
     // 6. Admin Endpoints
     getAdminStats: () => apiFetch('/api/admin/stats', { method: 'GET' }),

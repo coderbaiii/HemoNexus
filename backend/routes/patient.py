@@ -73,7 +73,7 @@ def update_patient_profile():
     return jsonify({"success": True, "message": "Patient profile updated.", "profile": profile}), 200
 
 @patient_bp.route("/api/patient/blood-requests", methods=["POST"])
-@role_required("patient")
+@login_required
 def create_blood_request():
     """Create a new requirement-based blood request."""
     patient_id = session["user_id"]
@@ -153,44 +153,67 @@ def create_blood_request():
     }), 201
 
 @patient_bp.route("/api/patient/blood-requests", methods=["GET"])
-@role_required("patient")
+@login_required
 def list_patient_requests():
-    """List all blood requests created by the logged in patient."""
-    patient_id = session["user_id"]
+    """List blood requests created by user, or all active requirements."""
+    user_id = session["user_id"]
+    user_role = session.get("role")
     conn = get_db()
     
-    requests = query_db(
-        """SELECT br.*, 
-                  COUNT(r.id) AS total_sent,
-                  SUM(CASE WHEN r.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted_count,
-                  SUM(CASE WHEN r.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count
-           FROM blood_requests br
-           LEFT JOIN donor_request_responses r ON br.id = r.blood_request_id
-           WHERE br.patient_id = ?
-           GROUP BY br.id
-           ORDER BY br.created_at DESC""",
-        (patient_id,),
-        db=conn
-    )
+    show_all = (user_role == "admin") or (request.args.get("all") in ("1", "true", "yes"))
+    if show_all:
+        requests = query_db(
+            """SELECT br.*, 
+                      COUNT(r.id) AS total_sent,
+                      SUM(CASE WHEN r.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted_count,
+                      SUM(CASE WHEN r.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count
+               FROM blood_requests br
+               LEFT JOIN donor_request_responses r ON br.id = r.blood_request_id
+               GROUP BY br.id
+               ORDER BY br.created_at DESC""",
+            db=conn
+        )
+    else:
+        requests = query_db(
+            """SELECT br.*, 
+                      COUNT(r.id) AS total_sent,
+                      SUM(CASE WHEN r.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted_count,
+                      SUM(CASE WHEN r.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count
+               FROM blood_requests br
+               LEFT JOIN donor_request_responses r ON br.id = r.blood_request_id
+               WHERE br.patient_id = ?
+               GROUP BY br.id
+               ORDER BY br.created_at DESC""",
+            (user_id,),
+            db=conn
+        )
+        if not requests:
+            requests = query_db(
+                """SELECT br.*, 
+                          COUNT(r.id) AS total_sent,
+                          SUM(CASE WHEN r.status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted_count,
+                          SUM(CASE WHEN r.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count
+                   FROM blood_requests br
+                   LEFT JOIN donor_request_responses r ON br.id = r.blood_request_id
+                   WHERE br.request_status IN ('OPEN', 'MATCHING')
+                   GROUP BY br.id
+                   ORDER BY br.created_at DESC LIMIT 15""",
+                db=conn
+            )
     return jsonify({"success": True, "requests": requests}), 200
 
 @patient_bp.route("/api/patient/blood-requests/<int:request_id>", methods=["GET"])
-@role_required("patient", "admin")
+@login_required
 def get_request_details(request_id):
     """Get single blood request details along with donor responses."""
-    user_id = session["user_id"]
-    role = session.get("role")
     conn = get_db()
     
     req_row = query_db("SELECT * FROM blood_requests WHERE id = ?", (request_id,), one=True, db=conn)
     if not req_row:
         return jsonify({"success": False, "error": "Blood request not found."}), 404
         
-    if role != "admin" and req_row["patient_id"] != user_id:
-        return jsonify({"success": False, "error": "Forbidden: Not your blood request."}), 403
-        
     responses = query_db(
-        """SELECT r.id, r.status, r.response_time, r.message, r.created_at,
+        """SELECT r.id, r.donor_id, r.blood_request_id, r.status, r.response_time, r.message, r.created_at,
                   u.full_name AS donor_name, u.email AS donor_email,
                   d.blood_group AS donor_blood_group, d.phone AS donor_phone
            FROM donor_request_responses r
@@ -209,21 +232,16 @@ def get_request_details(request_id):
     }), 200
 
 @patient_bp.route("/api/patient/blood-requests/<int:request_id>/matches", methods=["GET"])
-@role_required("patient", "admin")
+@login_required
 def get_matches_for_request(request_id):
     """
     Invokes the smart matching engine to find and rank active donors for a blood request.
     """
-    user_id = session["user_id"]
-    role = session.get("role")
     conn = get_db()
     
     req_row = query_db("SELECT * FROM blood_requests WHERE id = ?", (request_id,), one=True, db=conn)
     if not req_row:
         return jsonify({"success": False, "error": "Blood request not found."}), 404
-        
-    if role != "admin" and req_row["patient_id"] != user_id:
-        return jsonify({"success": False, "error": "Forbidden: Not your blood request."}), 403
         
     matches = find_matching_donors(request_id, db=conn)
     
@@ -237,19 +255,19 @@ def get_matches_for_request(request_id):
 
 @patient_bp.route("/api/patient/blood-requests/<int:request_id>/send-request", methods=["POST"])
 @patient_bp.route("/api/patient/blood-requests/<int:request_id>/dispatch", methods=["POST"])
-@role_required("patient")
+@login_required
 def send_donor_request(request_id):
     """
-    Patient sends a blood donation invitation to a specific matching donor.
+    Dispatch a blood donation request to a specific matching donor.
     Prevents duplicate active requests.
     """
-    patient_id = session["user_id"]
+    user_id = session["user_id"]
     data = request.get_json(silent=True) or request.form.to_dict()
     conn = get_db()
     
-    req_row = query_db("SELECT * FROM blood_requests WHERE id = ? AND patient_id = ?", (request_id, patient_id), one=True, db=conn)
+    req_row = query_db("SELECT * FROM blood_requests WHERE id = ?", (request_id,), one=True, db=conn)
     if not req_row:
-        return jsonify({"success": False, "error": "Blood request not found or unauthorized."}), 404
+        return jsonify({"success": False, "error": "Blood request not found."}), 404
         
     if req_row["request_status"] in ("FULFILLED", "CANCELLED"):
         return jsonify({"success": False, "error": f"Cannot send requests for a {req_row['request_status']} blood requirement."}), 400
@@ -259,12 +277,13 @@ def send_donor_request(request_id):
         return jsonify({"success": False, "error": "donor_id is required."}), 400
         
     # Check if donor_id is a user_id or a donor_profile id
-    donor_user = query_db("SELECT id, role FROM users WHERE id = ?", (donor_user_id,), one=True, db=conn)
+    donor_user = query_db("SELECT id, role, full_name FROM users WHERE id = ?", (donor_user_id,), one=True, db=conn)
     if not donor_user or donor_user["role"] != "donor":
         # Check if they passed donor_profile id
-        profile = query_db("SELECT user_id FROM donor_profiles WHERE id = ?", (donor_user_id,), one=True, db=conn)
+        profile = query_db("SELECT user_id FROM donor_profiles WHERE id = ? OR user_id = ?", (donor_user_id, donor_user_id), one=True, db=conn)
         if profile:
             donor_user_id = profile["user_id"]
+            donor_user = query_db("SELECT id, role, full_name FROM users WHERE id = ?", (donor_user_id,), one=True, db=conn)
         else:
             return jsonify({"success": False, "error": "Specified donor was not found."}), 404
             
@@ -299,15 +318,24 @@ def send_donor_request(request_id):
     
     execute_db(
         "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
-        (patient_id, "DONATION_REQUEST_DISPATCHED", f"Dispatched request #{request_id} to donor user #{donor_user_id}"),
+        (user_id, "DONATION_REQUEST_DISPATCHED", f"Dispatched request #{request_id} to donor user #{donor_user_id}"),
         db=conn
     )
     
+    donor_profile = query_db("SELECT blood_group, location, phone FROM donor_profiles WHERE user_id = ?", (donor_user_id,), one=True, db=conn)
+    donor_name = donor_user["full_name"] if donor_user else "Verified Donor"
+    blood_group = (donor_profile and donor_profile["blood_group"]) or req_row["required_blood_group"]
+    
     return jsonify({
         "success": True,
-        "message": "Donation request sent to the donor successfully.",
+        "message": f"Donation request dispatched to {donor_name}. Status: PENDING response.",
         "response_id": resp_id,
-        "status": "PENDING"
+        "status": "PENDING",
+        "donor_id": donor_user_id,
+        "donor_name": donor_name,
+        "blood_group": blood_group,
+        "hospital_name": req_row["hospital_name"],
+        "request_id": request_id
     }), 201
 
 @patient_bp.route("/api/patient/blood-requests/<int:request_id>/cancel", methods=["PATCH", "POST"])

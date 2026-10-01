@@ -162,6 +162,76 @@
               {% endfor %}
             </tbody>
           </table>
+      </div>
+
+      <!-- Live Dispatched Donors Radar -->
+      <div class="card">
+        <div class="card-header d-flex justify-between align-center">
+          <div>
+            <h3 class="card-title">Live Dispatched Donors Radar</h3>
+            <p class="card-subtitle">Real-time status of blood donation dispatches and donor assignments</p>
+          </div>
+          <div class="d-flex align-center gap-2">
+            <span class="badge badge-teal" id="liveDispatchesBadge"><i class="fa-solid fa-paper-plane me-1"></i> Live Dispatches</span>
+            <a href="/match" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> Dispatch Donor</a>
+          </div>
+        </div>
+        <div class="table-container" style="border: none; border-radius: 0;">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Dispatched Donor</th>
+                <th>Requirement & Hospital</th>
+                <th>Status</th>
+                <th>Dispatched Time</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardDispatchesBody">
+              {% if dispatches %}
+                {% for d in dispatches %}
+                <tr>
+                  <td>
+                    <div class="d-flex align-center gap-2">
+                      <span class="blood-badge blood-badge-sm">{{ d.donor_blood_group or d.required_blood_group }}</span>
+                      <div>
+                        <div class="fw-bold text-slate-900">{{ d.donor_name }}</div>
+                        <div class="text-xs text-muted"><i class="fa-solid fa-user-tag text-teal"></i> Verified Donor</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="fw-bold text-slate-800">#REQ-{{ d.blood_request_id }}</div>
+                    <div class="text-xs text-muted"><i class="fa-solid fa-hospital text-primary"></i> {{ d.hospital_name }}</div>
+                  </td>
+                  <td>
+                    {% if d.status == 'ACCEPTED' %}
+                      <span class="badge badge-success"><i class="fa-solid fa-check me-1"></i> Accepted</span>
+                    {% elif d.status == 'REJECTED' %}
+                      <span class="badge badge-secondary"><i class="fa-solid fa-xmark me-1"></i> Unavailable</span>
+                    {% else %}
+                      <span class="badge badge-info"><i class="fa-solid fa-paper-plane me-1"></i> Dispatched (Pending)</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="text-xs text-muted"><i class="fa-regular fa-clock me-1"></i> Recent</span>
+                  </td>
+                  <td>
+                    <a href="/match?request_id={{ d.blood_request_id }}&group={{ d.required_blood_group }}" class="btn btn-outline btn-sm">
+                      <i class="fa-solid fa-crosshairs me-1"></i> Details
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr id="dispatchesEmptyRow">
+                  <td colspan="5" class="py-4 text-center text-muted">
+                    <i class="fa-solid fa-paper-plane text-muted me-2"></i> No active dispatches found. Use <a href="/match" class="text-primary fw-bold">Smart Matcher</a> to dispatch donors.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
         </div>
       </div>
 

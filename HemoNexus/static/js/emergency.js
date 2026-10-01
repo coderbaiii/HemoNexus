@@ -30,11 +30,14 @@ const startEmergencyBroadcast = async () => {
 
   const originalBtnHtml = broadcastBtn ? broadcastBtn.innerHTML : '<i class="fa-solid fa-satellite-dish"></i> Transmit Code-Red Broadcast Now';
 
-  // 1. Role verification
+  // 1. Role verification — must be logged in
   const me = await HemoAPI.getCurrentUser().catch(() => null);
-  const userRole = me && me.user ? me.user.role : null;
-  if (userRole && userRole !== 'patient' && userRole !== 'admin') {
-    HemoUI.showToast('Authorization Notice', 'Emergency broadcast requires a patient account.', 'warning');
+  const user = me && me.user ? me.user : null;
+
+  if (!user) {
+    // Not logged in
+    HemoUI.showToast('Login Required', 'Please sign in to send emergency broadcasts.', 'warning');
+    setTimeout(() => { window.location.href = '/login?next=/emergency'; }, 1500);
     return;
   }
 
@@ -177,6 +180,11 @@ const startEmergencyBroadcast = async () => {
 
   } catch (err) {
     console.error('Error during emergency broadcast:', err);
+    if (err && err.status === 401) {
+      HemoUI.showToast('Login Required', 'Please sign in as a patient to send emergency broadcasts.', 'warning');
+      setTimeout(() => { window.location.href = '/login?next=/emergency'; }, 1500);
+      return;
+    }
     if (broadcastBtn) {
       broadcastBtn.disabled = false;
       broadcastBtn.innerHTML = originalBtnHtml;
@@ -185,6 +193,63 @@ const startEmergencyBroadcast = async () => {
   }
 };
 
+const dispatchEmergencySingleDonor = async (requestId, donorUserId, donorName) => {
+  const btn = document.getElementById(`btnEmergencyDispatch-${donorUserId}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+  }
+
+  try {
+    const res = await HemoAPI.sendDonorRequest(requestId, donorUserId);
+    if (res && res.success) {
+      if (btn) {
+        btn.className = 'btn btn-success btn-sm';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Request Dispatched';
+      }
+      try {
+        const acts = JSON.parse(sessionStorage.getItem('hemonexus_recent_dispatches') || '[]');
+        acts.unshift({
+          id: res.response_id || Date.now(),
+          request_id: requestId,
+          donor_name: donorName,
+          status: 'PENDING',
+          type: 'DISPATCH',
+          title: 'Donor Request Dispatched',
+          desc: `Emergency dispatch transmitted to ${donorName} for #REQ-${requestId}`,
+          timestamp: new Date().toISOString(),
+          iconClass: 'activity-icon-primary',
+          icon: 'fa-paper-plane'
+        });
+        sessionStorage.setItem('hemonexus_recent_dispatches', JSON.stringify(acts.slice(0, 30)));
+      } catch (e) {}
+      const actions = document.getElementById(`emergencyActions-${donorUserId}`);
+      if (actions && !document.getElementById(`statusBadge-${donorUserId}`)) {
+        const statusSpan = document.createElement('span');
+        statusSpan.id = `statusBadge-${donorUserId}`;
+        statusSpan.className = 'badge badge-teal ms-1';
+        statusSpan.innerHTML = '<i class="fa-solid fa-clock me-1"></i> PENDING';
+        actions.appendChild(statusSpan);
+      }
+    }
+  } catch (err) {
+    if (err && err.status === 409) {
+      if (btn) {
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i> Already Dispatched';
+      }
+    } else {
+      if (btn) {
+        btn.disabled = false;
+        btn.className = 'btn btn-emergency btn-sm';
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Dispatch Now';
+      }
+      console.warn(`Could not dispatch to donor ${donorUserId}:`, err);
+    }
+  }
+};
 const startEmergencyResponsePolling = (requestId) => {
   clearInterval(pollInterval);
   const responseCountEl = document.getElementById('liveResponseCount');
