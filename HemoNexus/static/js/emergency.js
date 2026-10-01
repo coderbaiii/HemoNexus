@@ -114,13 +114,36 @@ const startEmergencyBroadcast = async () => {
       return;
     }
 
-    // 5. Render Real Match Cards — Alert Sent (not Dispatched)
-    matches.forEach(match => {
+    // 5. Alert Each Real Match via sendDonorRequest & Render in "Alerted Donors — Awaiting Response"
+    const alertedCountEl = document.getElementById('liveAlertedCount');
+    if (alertedCountEl) {
+      alertedCountEl.textContent = `${matches.length} Verified Donor${matches.length === 1 ? '' : 's'}`;
+    }
+
+    let successfulAlerts = 0;
+
+    await Promise.all(matches.map(async (match) => {
       const donorUserId = match.user_id || match.donor_id || match.id;
       const donorName = match.full_name || match.name || 'Verified Donor';
       const donorBg = match.blood_group || bloodGroup;
       const dist = match.distance_km != null ? match.distance_km : radius;
       const matchScore = match.match_score || 95;
+
+      let sendStatus = 'PENDING';
+      try {
+        const sendRes = await HemoAPI.sendDonorRequest(activeEmergencyRequestId, donorUserId);
+        if (sendRes && sendRes.success) {
+          successfulAlerts++;
+          sendStatus = sendRes.status || 'PENDING';
+        }
+      } catch (sendErr) {
+        if (sendErr && sendErr.status === 409) {
+          successfulAlerts++;
+          sendStatus = 'PENDING';
+        } else {
+          console.warn(`Dispatch error for donor ${donorUserId}:`, sendErr);
+        }
+      }
 
       const card = document.createElement('div');
       card.id = `emergencyDonorCard-${donorUserId}`;
@@ -140,14 +163,14 @@ const startEmergencyBroadcast = async () => {
             </div>
           </div>
           <div class="d-flex align-center gap-2" id="emergencyActions-${donorUserId}">
-            <button class="btn btn-emergency btn-sm" id="btnEmergencyDispatch-${donorUserId}" onclick="dispatchEmergencySingleDonor(${activeEmergencyRequestId}, ${donorUserId}, '${donorName.replace(/'/g, "\\'")}')">
-              <i class="fa-solid fa-paper-plane me-1"></i> Dispatch Now
-            </button>
+            <span class="badge badge-teal" id="statusBadge-${donorUserId}">
+              <i class="fa-solid fa-paper-plane me-1"></i> Alert Dispatched (${sendStatus})
+            </span>
           </div>
         </div>
       `;
       if (responseFeed) responseFeed.appendChild(card);
-    });
+    }));
 
     // 6. Start Real Live Response Polling
     startEmergencyResponsePolling(activeEmergencyRequestId);
@@ -159,48 +182,6 @@ const startEmergencyBroadcast = async () => {
       broadcastBtn.innerHTML = originalBtnHtml;
     }
     HemoUI.showToast('Broadcast Failed', err.message || 'Could not initiate emergency broadcast.', 'error');
-  }
-};
-
-const dispatchEmergencySingleDonor = async (requestId, donorUserId, donorName) => {
-  const btn = document.getElementById(`btnEmergencyDispatch-${donorUserId}`);
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
-  }
-
-  try {
-    const res = await HemoAPI.sendDonorRequest(requestId, donorUserId);
-    if (res && res.success) {
-      if (btn) {
-        btn.className = 'btn btn-success btn-sm';
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> ✓ Request Dispatched';
-      }
-      const actions = document.getElementById(`emergencyActions-${donorUserId}`);
-      if (actions && !document.getElementById(`statusBadge-${donorUserId}`)) {
-        const statusSpan = document.createElement('span');
-        statusSpan.id = `statusBadge-${donorUserId}`;
-        statusSpan.className = 'badge badge-teal ms-1';
-        statusSpan.innerHTML = '<i class="fa-solid fa-clock me-1"></i> PENDING';
-        actions.appendChild(statusSpan);
-      }
-    }
-  } catch (err) {
-    if (err && err.status === 409) {
-      if (btn) {
-        btn.className = 'btn btn-secondary btn-sm';
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i> Already Dispatched';
-      }
-    } else {
-      if (btn) {
-        btn.disabled = false;
-        btn.className = 'btn btn-emergency btn-sm';
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Dispatch Now';
-      }
-      console.warn(`Could not dispatch to donor ${donorUserId}:`, err);
-    }
   }
 };
 
