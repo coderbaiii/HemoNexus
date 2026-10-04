@@ -126,6 +126,27 @@ def create_app(config_class=Config):
             db_path.parent.mkdir(parents=True, exist_ok=True)
             with app.app_context():
                 init_database(str(db_path), seed_demo=True)
+        else:
+            with app.app_context():
+                try:
+                    conn = get_db(str(db_path))
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS hospitals (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                            city TEXT,
+                            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                        );
+                    """)
+                    conn.execute("""
+                        INSERT OR IGNORE INTO hospitals (name, city, created_at)
+                        SELECT DISTINCT hospital_name, location, datetime('now')
+                        FROM blood_requests
+                        WHERE hospital_name IS NOT NULL AND TRIM(hospital_name) != ''
+                    """)
+                    conn.commit()
+                except Exception:
+                    pass
 
     @app.context_processor
     def inject_user():
@@ -177,11 +198,11 @@ def create_app(config_class=Config):
             return redirect(url_for('home'))
         return redirect(url_for('login'))
 
-    @app.route('/home')
-    @app.route('/home.html')
+    @app.route('/main')
     @app.route('/landing')
     @app.route('/landing.html')
-    @app.route('/main')
+    @app.route('/home.html')
+    @app.route('/home')
     def home():
         return render_template('home.html', is_public_page=True, active_page='home')
 
@@ -223,7 +244,7 @@ def create_app(config_class=Config):
                     next_page = request.args.get('next')
                     if next_page and next_page.startswith('/'):
                         return redirect(next_page)
-                    return redirect(url_for('dashboard'))
+                    return redirect(url_for('home'))
 
         return render_template(
             'login.html',
@@ -294,7 +315,7 @@ def create_app(config_class=Config):
                         session['role'] = role
 
                         flash(f"Account successfully created for {full_name}! Welcome to HemoNexus.", "success")
-                        return redirect(url_for('dashboard'))
+                        return redirect(url_for('home'))
                     except Exception as ex:
                         error = f"Registration error: {str(ex)}"
 

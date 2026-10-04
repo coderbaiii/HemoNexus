@@ -3,6 +3,12 @@
 {% block title %}Smart Donor Matching Engine - HemoNexus{% endblock %}
 
 {% block content %}
+<!-- One-Line Workflow Guide -->
+<div class="alert alert-info d-flex align-center gap-2 mb-3 py-2 px-3 rounded-lg text-xs fw-semibold" style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); color: var(--primary);">
+  <i class="fa-solid fa-circle-info"></i>
+  <span>Step 1: Find donors &rarr; Step 2: Dispatch &rarr; Step 3: Donor accepts.</span>
+</div>
+
 <div class="page-header">
   <div>
     <h1 class="page-title">Requirement-Based Smart Donor Matching Engine</h1>
@@ -27,7 +33,7 @@
     </div>
   </div>
   <div class="card-body p-6">
-    <div class="d-grid grid-4 gap-4 mb-3">
+    <div class="d-grid gap-4 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
       <div class="form-group">
         <label class="form-label">Target City / Location *</label>
         <select class="form-select" id="matchCityLocation" onchange="createRequestAndMatch()">
@@ -41,6 +47,12 @@
           <option value="Pune">Pune</option>
           <option value="All">All Cities</option>
         </select>
+      </div>
+
+      <div class="form-group position-relative">
+        <label class="form-label">Destination Hospital</label>
+        <input type="text" class="form-control" id="matchHospitalName" placeholder="Search destination hospital..." autocomplete="off" value="" oninput="handleMatchHospitalSearch(this.value); createRequestAndMatch();">
+        <div id="matchHospitalDropdown" class="hospital-autocomplete-dropdown d-none" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 1050; max-height: 200px; overflow-y: auto; background: #ffffff; border: 1px solid var(--slate-200); border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-top: 2px;"></div>
       </div>
 
       <div class="form-group">
@@ -726,6 +738,85 @@ function showSelectParamsPrompt() {
   }
 }
 
+let matchHospitalSearchTimer = null;
+function handleMatchHospitalSearch(query) {
+  const dropdown = document.getElementById('matchHospitalDropdown');
+  const input = document.getElementById('matchHospitalName');
+  const citySelect = document.getElementById('matchCityLocation');
+  if (!dropdown || !input) return;
+
+  clearTimeout(matchHospitalSearchTimer);
+  matchHospitalSearchTimer = setTimeout(async () => {
+    const q = (query || '').trim();
+    try {
+      const res = await HemoAPI.getHospitals(q).catch(() => null);
+      const hospitals = (res && res.success && Array.isArray(res.hospitals)) ? res.hospitals : [];
+
+      let html = '';
+      if (hospitals.length > 0) {
+        html += hospitals.map(h => `
+          <div class="hospital-autocomplete-item p-2 border-bottom cursor-pointer hover-bg-light text-start" data-name="${escapeHtml(h.name)}" data-city="${escapeHtml(h.city || '')}">
+            <div class="fw-semibold text-slate-900 text-xs"><i class="fa-solid fa-hospital text-primary me-1"></i> ${escapeHtml(h.name)}</div>
+            ${h.city ? `<div class="text-muted" style="font-size: 0.7rem;"><i class="fa-solid fa-location-dot me-1"></i> ${escapeHtml(h.city)}</div>` : ''}
+          </div>
+        `).join('');
+      }
+
+      if (q.length > 1) {
+        const exactMatch = hospitals.some(h => h.name.toLowerCase() === q.toLowerCase());
+        if (!exactMatch) {
+          html += `
+            <div class="hospital-autocomplete-item p-2 cursor-pointer bg-primary-50 text-primary fw-semibold text-xs text-start" data-add-new="true" data-name="${escapeHtml(q)}">
+              <i class="fa-solid fa-plus-circle me-1"></i> Add "<strong>${escapeHtml(q)}</strong>" as new hospital
+            </div>
+          `;
+        }
+      }
+
+      if (html) {
+        dropdown.innerHTML = html;
+        dropdown.classList.remove('d-none');
+        dropdown.querySelectorAll('.hospital-autocomplete-item').forEach(item => {
+          item.addEventListener('click', async () => {
+            const name = item.getAttribute('data-name');
+            const isAdd = item.getAttribute('data-add-new') === 'true';
+            const city = item.getAttribute('data-city') || citySelect?.value || 'Kolkata';
+            if (isAdd) {
+              try { await HemoAPI.createHospital(name, city); } catch (e) {}
+            } else if (item.getAttribute('data-city') && citySelect) {
+              citySelect.value = item.getAttribute('data-city');
+            }
+            input.value = name;
+            dropdown.classList.add('d-none');
+            createRequestAndMatch();
+          });
+        });
+      } else {
+        dropdown.classList.add('d-none');
+      }
+    } catch (e) {}
+  }, 200);
+}
+
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('matchHospitalDropdown');
+  const input = document.getElementById('matchHospitalName');
+  if (dropdown && input && !input.contains(e.target) && !dropdown.contains(e.target)) {
+    dropdown.classList.add('d-none');
+  }
+});
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[m]));
+}
+
 async function createRequestAndMatch() {
   const selectedCity = document.getElementById('matchCityLocation')?.value || '';
   const recipientGroup = document.getElementById('matchRecipientGroup')?.value || '';
@@ -771,23 +862,43 @@ async function dispatchDonorRequest(requestId, donorId, donorName, bloodGroup) {
     const selectedCity = document.getElementById('matchCityLocation')?.value || 'Kolkata';
     const recipientGroup = document.getElementById('matchRecipientGroup')?.value || bloodGroup || 'O+';
     const radius = parseFloat(document.getElementById('matchRadius')?.value || '15');
+    const hospitalInput = document.getElementById('matchHospitalName')?.value?.trim() || '';
+    const hospName = hospitalInput || `${selectedCity} Regional Emergency Center`;
 
     try {
-      const createRes = await HemoAPI.createBloodRequest({
-        required_blood_group: recipientGroup,
-        hospital_name: `${selectedCity} Regional Emergency Center`,
-        location: selectedCity,
-        urgency: 'URGENT',
-        required_units: 1,
-        preferred_max_distance: radius
+      // 1. Reuse existing OPEN/MATCHING request for same patient and blood group (Requirement 1 & 7)
+      const reqListRes = await HemoAPI.getPatientRequests().catch(() => null);
+      const allRequests = (reqListRes && reqListRes.success && Array.isArray(reqListRes.requests)) ? reqListRes.requests : [];
+      const existingReq = allRequests.find(r => {
+        const st = (r.request_status || r.status || '').toUpperCase();
+        const bg = (r.required_blood_group || r.blood_group || '').toUpperCase();
+        return (st === 'OPEN' || st === 'MATCHING') && bg === recipientGroup.toUpperCase();
       });
 
-      if (createRes && createRes.success && createRes.request) {
-        targetReqId = createRes.request.id;
+      if (existingReq) {
+        targetReqId = existingReq.id;
         currentRequestId = targetReqId;
+      } else {
+        if (hospitalInput) {
+          try { await HemoAPI.createHospital(hospitalInput, selectedCity); } catch (e) {}
+        }
+        // Create a new request only if none exists
+        const createRes = await HemoAPI.createBloodRequest({
+          required_blood_group: recipientGroup,
+          hospital_name: hospName,
+          location: selectedCity,
+          urgency: 'URGENT',
+          required_units: 1,
+          preferred_max_distance: radius
+        });
+
+        if (createRes && createRes.success && createRes.request) {
+          targetReqId = createRes.request.id;
+          currentRequestId = targetReqId;
+        }
       }
     } catch (e) {
-      console.warn('Auto-create blood request failed:', e);
+      console.warn('Request resolution failed:', e);
     }
   }
 

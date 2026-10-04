@@ -171,6 +171,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- ============================================================================
+-- 9. HOSPITALS TABLE
+-- Destination hospitals for emergency blood requests and matching telemetry.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS hospitals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    city TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================================
 -- COMPATIBILITY VIEWS & TRIGGERS
 -- ============================================================================
 CREATE VIEW IF NOT EXISTS donors AS
@@ -615,7 +626,6 @@ def seed_data(conn):
     # 4. Seed a completed donation record for Amitav Sengupta
     if "amitav.donor@example.com" in donor_db_ids:
         amitav_donor_id = donor_db_ids["amitav.donor@example.com"]
-        cur.execute("SELECT id FROM donation_records WHERE donor_id = ?", (amitav_donor_id,))
         if not cur.fetchone():
             cur.execute(
                 """INSERT INTO donation_records 
@@ -623,6 +633,14 @@ def seed_data(conn):
                    VALUES (?, NULL, ?, ?, 'WHOLE_BLOOD', 'COMPLETED', ?, ?)""",
                 (amitav_donor_id, "Kolkata Central Blood Bank & Transfusion Center", (now - datetime.timedelta(days=95)).isoformat(), now_iso, now_iso)
             )
+
+    # 5. Backfill hospitals from blood_requests
+    cur.execute("""
+        INSERT OR IGNORE INTO hospitals (name, city, created_at)
+        SELECT DISTINCT hospital_name, location, datetime('now')
+        FROM blood_requests
+        WHERE hospital_name IS NOT NULL AND TRIM(hospital_name) != ''
+    """)
 
     conn.commit()
 

@@ -126,7 +126,7 @@ const HemoAuth = (() => {
       if (res && res.success) {
         HemoUI.showToast('Welcome Back', res.message || 'Signed in successfully.', 'success');
         const urlParams = new URLSearchParams(window.location.search);
-        const nextUrl = urlParams.get('next') || '/dashboard';
+        const nextUrl = urlParams.get('next') || '/home';
         window.location.href = nextUrl;
       } else {
         throw new Error(res.error || 'Login failed.');
@@ -667,10 +667,32 @@ const HemoUI = (() => {
     requestAnimationFrame(updateCount);
   };
 
+  const formatTimeAgo = (isoString) => {
+    if (!isoString) return 'Just now';
+    try {
+      const past = new Date(isoString).getTime();
+      if (isNaN(past)) return 'Just now';
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - past) / 1000));
+      if (diffSec < 60) return 'Just now';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 30) return `${diffDay}d ago`;
+      const diffMo = Math.floor(diffDay / 30);
+      return `${diffMo}mo ago`;
+    } catch (e) {
+      return 'Just now';
+    }
+  };
+
   return {
     openModal,
     closeModal,
     showToast,
+    formatTimeAgo,
     selectBloodGroupVisualizer,
     triggerMatchingSearchAnimation
   };
@@ -725,16 +747,20 @@ const HemoAPI = (() => {
     cancelBloodRequest: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/cancel`, { method: 'POST' }),
     fulfillBloodRequest: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/fulfill`, { method: 'POST' }),
 
-    // 2. Smart Matching Candidates (Real Backend Heuristic Engine)
+    // 2. Hospitals Directory & Auto-Registration
+    getHospitals: (q = '') => apiFetch('/api/hospitals' + (q ? '?q=' + encodeURIComponent(q) : ''), { method: 'GET' }),
+    createHospital: (name, city = '') => apiFetch('/api/hospitals', { method: 'POST', body: { name, city } }),
+
+    // 3. Smart Matching Candidates (Real Backend Heuristic Engine)
     getRequestMatches: (requestId) => apiFetch(`/api/patient/blood-requests/${requestId}/matches`, { method: 'GET' }),
 
-    // 3. Donor Dispatch / Send Request (Priority Endpoint - uses user_id)
+    // 4. Donor Dispatch / Send Request (Priority Endpoint - uses user_id)
     sendDonorRequest: (requestId, donorUserId) => apiFetch(`/api/patient/blood-requests/${requestId}/send-request`, {
       method: 'POST',
       body: { donor_id: donorUserId }
     }),
 
-    // 4. Donor Inbox & Action Responses
+    // 5. Donor Inbox & Action Responses
     getDonorRequests: () => apiFetch('/api/donor/requests', { method: 'GET' }),
     acceptDonorRequest: (responseId, message) => apiFetch(`/api/donor/requests/${responseId}/accept`, {
       method: 'POST',
@@ -745,7 +771,7 @@ const HemoAPI = (() => {
       body: { message }
     }),
 
-    // 5. User / Identity & Directory
+    // 6. User / Identity & Directory
     getCurrentUser: () => apiFetch('/api/me', { method: 'GET' }),
     getPatientProfile: () => apiFetch('/api/patient/profile', { method: 'GET' }),
     getDonorProfile: () => apiFetch('/api/donor/profile', { method: 'GET' }),
@@ -753,9 +779,29 @@ const HemoAPI = (() => {
     getActivities: () => apiFetch('/api/activities', { method: 'GET' }),
     getDispatches: () => apiFetch('/api/dispatches', { method: 'GET' }),
 
-    // 6. Admin Endpoints
+    // 7. Admin Endpoints
     getAdminStats: () => apiFetch('/api/admin/stats', { method: 'GET' }),
     getAdminRequests: () => apiFetch('/api/admin/blood-requests', { method: 'GET' }),
     getAdminResponses: () => apiFetch('/api/admin/responses', { method: 'GET' })
   };
 })();
+
+// Requirement 6: Dynamic header role and name update from GET /api/me
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const roleEl = document.getElementById('headerUserRole');
+    const nameEl = document.getElementById('headerUserName');
+    if (roleEl || nameEl) {
+      const meRes = await HemoAPI.getCurrentUser().catch(() => null);
+      if (meRes && meRes.user) {
+        if (roleEl) {
+          const r = meRes.user.role || 'user';
+          roleEl.textContent = r.charAt(0).toUpperCase() + r.slice(1);
+        }
+        if (nameEl && meRes.user.name) {
+          nameEl.textContent = meRes.user.name;
+        }
+      }
+    }
+  } catch (e) {}
+});

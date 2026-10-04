@@ -55,8 +55,11 @@ const initDashboardData = async () => {
     requestAnimationFrame(update);
   };
 
-  // Helper for human-readable relative timestamp
+  // Helper for human-readable relative timestamp (Requirement 8: "10h ago")
   const formatRelativeTime = (isoString) => {
+    if (window.HemoUI && typeof window.HemoUI.formatTimeAgo === 'function') {
+      return window.HemoUI.formatTimeAgo(isoString);
+    }
     if (!isoString) return 'Just now';
     try {
       const past = new Date(isoString).getTime();
@@ -65,11 +68,11 @@ const initDashboardData = async () => {
       const diffSec = Math.max(0, Math.floor((now - past) / 1000));
       if (diffSec < 60) return 'Just now';
       const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? '' : 's'} ago`;
+      if (diffMin < 60) return `${diffMin}m ago`;
       const diffHr = Math.floor(diffMin / 60);
-      if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? '' : 's'} ago`;
+      if (diffHr < 24) return `${diffHr}h ago`;
       const diffDay = Math.floor(diffHr / 24);
-      return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+      return `${diffDay}d ago`;
     } catch (e) {
       return 'Just now';
     }
@@ -173,11 +176,11 @@ const initDashboardData = async () => {
           const status = (d.status || 'PENDING').toUpperCase();
           const rawTime = d.created_at || d.response_time;
 
-          let statusBadge = '<span class="badge badge-info"><i class="fa-solid fa-paper-plane me-1"></i> Dispatched (Pending)</span>';
+          let statusBadge = '<span class="badge badge-info"><i class="fa-solid fa-paper-plane me-1"></i> Pending</span>';
           if (status === 'ACCEPTED') {
-            statusBadge = '<span class="badge badge-success"><i class="fa-solid fa-circle-check me-1"></i> Accepted</span>';
+            statusBadge = '<span class="badge badge-success"><i class="fa-solid fa-check me-1"></i> Accepted</span>';
           } else if (status === 'REJECTED') {
-            statusBadge = '<span class="badge badge-secondary"><i class="fa-solid fa-circle-xmark me-1"></i> Unavailable</span>';
+            statusBadge = '<span class="badge badge-secondary"><i class="fa-solid fa-xmark me-1"></i> Rejected</span>';
           }
 
           return `
@@ -244,13 +247,13 @@ const initDashboardData = async () => {
         if (status === 'FULFILLED') {
           statusBadge = '<span class="badge badge-success"><i class="fa-solid fa-check me-1"></i> Fulfilled</span>';
         } else if (acceptedCount > 0) {
-          statusBadge = `<span class="badge badge-success"><i class="fa-solid fa-user-check me-1"></i> ${acceptedCount} Accepted</span>`;
+          statusBadge = '<span class="badge badge-success"><i class="fa-solid fa-check me-1"></i> Accepted</span>';
         } else if (totalSent > 0) {
-          statusBadge = `<span class="badge badge-info"><i class="fa-solid fa-paper-plane me-1"></i> Dispatched (${totalSent} Sent)</span>`;
-        } else if (status === 'MATCHING') {
-          statusBadge = '<span class="badge badge-warning"><i class="fa-solid fa-clock me-1"></i> In Matching</span>';
-        } else if (status === 'OPEN') {
-          statusBadge = '<span class="badge badge-slate"><i class="fa-solid fa-hourglass-start me-1"></i> Open (Searching)</span>';
+          statusBadge = '<span class="badge badge-info"><i class="fa-solid fa-paper-plane me-1"></i> Pending</span>';
+        } else if (status === 'CANCELLED') {
+          statusBadge = '<span class="badge badge-secondary"><i class="fa-solid fa-xmark me-1"></i> Rejected</span>';
+        } else {
+          statusBadge = '<span class="badge badge-slate">Pending</span>';
         }
 
         const reqId = req.blood_request_id || req.id;

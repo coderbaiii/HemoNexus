@@ -131,6 +131,16 @@ def create_blood_request():
         req_date_time = now
         
     conn = get_db()
+    if hospital_name:
+        try:
+            execute_db(
+                "INSERT OR IGNORE INTO hospitals (name, city, created_at) VALUES (?, ?, ?)",
+                (hospital_name, location or None, now),
+                db=conn
+            )
+        except Exception:
+            pass
+
     req_id, _ = execute_db(
         """INSERT INTO blood_requests 
            (patient_id, required_blood_group, required_units, hospital_name, location, latitude, longitude, preferred_max_distance, required_date_time, urgency, request_status, created_at, updated_at)
@@ -151,6 +161,42 @@ def create_blood_request():
         "message": "Blood request created successfully. Smart matching is ready.",
         "request": req_record
     }), 201
+
+@patient_bp.route("/api/hospitals", methods=["GET"])
+def get_hospitals():
+    """Fetch hospitals, optionally filtered by search query parameter q."""
+    conn = get_db()
+    q = (request.args.get("q") or "").strip()
+    if q:
+        hospitals = query_db(
+            "SELECT * FROM hospitals WHERE name LIKE ? OR city LIKE ? ORDER BY name ASC",
+            (f"%{q}%", f"%{q}%"),
+            db=conn
+        )
+    else:
+        hospitals = query_db("SELECT * FROM hospitals ORDER BY name ASC", db=conn)
+    return jsonify({"success": True, "hospitals": hospitals or []}), 200
+
+@patient_bp.route("/api/hospitals", methods=["POST"])
+@login_required
+def create_hospital():
+    """Register a new hospital or return existing row if name exists."""
+    data = request.get_json(silent=True) or request.form.to_dict()
+    name = (data.get("name") or "").strip()
+    city = (data.get("city") or "").strip()
+    
+    if not name:
+        return jsonify({"success": False, "error": "Hospital name is required."}), 400
+        
+    conn = get_db()
+    existing = query_db("SELECT * FROM hospitals WHERE name = ? COLLATE NOCASE", (name,), one=True, db=conn)
+    if existing:
+        return jsonify({"success": True, "message": "Hospital already registered.", "hospital": existing}), 200
+        
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    hid, _ = execute_db("INSERT INTO hospitals (name, city, created_at) VALUES (?, ?, ?)", (name, city or None, now), db=conn)
+    hosp = query_db("SELECT * FROM hospitals WHERE id = ?", (hid,), one=True, db=conn)
+    return jsonify({"success": True, "message": "Hospital registered successfully.", "hospital": hosp}), 201
 
 @patient_bp.route("/api/patient/blood-requests", methods=["GET"])
 @login_required

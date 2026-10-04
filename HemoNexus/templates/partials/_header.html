@@ -39,8 +39,8 @@
         {{ session.get('user_name')[:2].upper() }}
       </div>
       <div class="user-info d-none d-sm-block text-start">
-        <div class="user-name fw-bold text-xs text-ink lh-1">{{ session.get('user_name') }}</div>
-        <div class="user-role text-muted text-capitalize" style="font-size: 0.65rem;">{{ session.get('role', 'user') }}</div>
+        <div class="user-name fw-bold text-xs text-ink lh-1" id="headerUserName">{{ session.get('user_name') }}</div>
+        <div class="user-role text-muted text-capitalize" id="headerUserRole" style="font-size: 0.65rem;">{{ session.get('role', 'user') }}</div>
       </div>
     </div>
     <a href="/logout" class="btn btn-outline-danger btn-sm" title="Sign Out">
