@@ -568,7 +568,11 @@ function runMatchAlgorithm() {
 
   const allowedGroups = COMPATIBILITY_RULES[recipientGroup] || [recipientGroup, 'O-'];
 
-  let matches = MASTER_DONOR_DIRECTORY.filter(c => allowedGroups.includes(c.blood_group));
+  let matches = MASTER_DONOR_DIRECTORY.filter(c => {
+    const isCompatible = allowedGroups.includes(c.blood_group);
+    const isActive = (c.profile_status || '').toUpperCase() === 'ACTIVE';
+    return isCompatible && isActive;
+  });
 
   if (selectedCity && selectedCity !== 'All') {
     matches = matches.filter(c => (c.city || '').toLowerCase().includes(selectedCity.toLowerCase()) || (c.location || '').toLowerCase().includes(selectedCity.toLowerCase()));
@@ -593,12 +597,13 @@ function renderMatchedDonorsList(matches) {
   const selectedCity = document.getElementById('matchCityLocation')?.value || 'All';
   const verifiedOnly = document.getElementById('matchVerifiedOnly')?.checked || false;
 
-  let filtered = matches;
+  // Always exclude inactive donors
+  let filtered = matches.filter(m => (m.profile_status || '').toUpperCase() === 'ACTIVE');
   if (selectedCity && selectedCity !== 'All') {
     filtered = filtered.filter(m => (m.masked_location || m.location || '').toLowerCase().includes(selectedCity.toLowerCase()));
   }
   if (verifiedOnly) {
-    filtered = filtered.filter(m => m.profile_status === 'ACTIVE' || m.last_verified_date);
+    filtered = filtered.filter(m => m.last_verified_date);
   }
 
   if (badge) {

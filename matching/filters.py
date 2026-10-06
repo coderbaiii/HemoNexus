@@ -68,48 +68,47 @@ def filter_by_active_status(candidates):
     """Filters out any donor whose database profile_status is not 'ACTIVE'."""
     return [d for d in candidates if (d.get("profile_status") or "").strip().upper() == "ACTIVE"]
 
-def filter_by_verification_status(candidates, current_dt=None, grace_days=30):
+def filter_by_verification_status(candidates, current_dt=None, grace_days=None):
     """
     Ensures donor's next_verification_date has not lapsed into VERIFICATION_DUE, INACTIVE, or UNKNOWN.
     Does not allow unverified or expired donors to match in emergency searches.
-    
-    Explicitly handles missing next_verification_date:
-    Does NOT silently drop candidates; assigns verification_status = 'UNKNOWN' and logs exclusion reason.
+    Uses runtime DB setting for grace_days if not explicitly provided.
     """
+    # Read runtime grace from DB if not provided
+    if grace_days is None:
+        try:
+            from backend.app import get_system_setting, get_db as _get_db
+            conn = _get_db()
+            val = get_system_setting("grace_period_seconds", db=conn)
+            grace_days = float(val) / 86400.0 if val is not None else Config.GRACE_PERIOD_DAYS
+        except Exception:
+            grace_days = Config.GRACE_PERIOD_DAYS
+
     now = current_dt or datetime.datetime.now(datetime.timezone.utc)
     valid = []
     for d in candidates:
         donor_id = d.get("donor_id") or d.get("id") or d.get("user_id")
         next_due_str = d.get("next_verification_date")
-        
+
         if not next_due_str:
-            d_copy = dict(d)
-            d_copy["verification_status"] = "UNKNOWN"
-            d_copy["exclusion_reason"] = "Missing next_verification_date"
             logger.warning(
-                "Donor %s excluded from matching: next_verification_date is missing (verification state set to UNKNOWN).",
+                "Donor %s excluded from matching: next_verification_date is missing.",
                 donor_id
             )
             continue
-            
+
         next_dt = parse_iso_datetime(next_due_str)
         if not next_dt:
-            d_copy = dict(d)
-            d_copy["verification_status"] = "UNKNOWN"
-            d_copy["exclusion_reason"] = "Invalid next_verification_date format"
             logger.warning(
-                "Donor %s excluded from matching: invalid next_verification_date format '%s' (verification state set to UNKNOWN).",
+                "Donor %s excluded from matching: invalid next_verification_date format '%s'.",
                 donor_id, next_due_str
             )
             continue
-            
+
         status = compute_lifecycle_status(next_dt, current_dt=now, grace_days=grace_days)
         if status == "ACTIVE":
             valid.append(d)
         else:
-            d_copy = dict(d)
-            d_copy["verification_status"] = status
-            d_copy["exclusion_reason"] = f"Verification status is {status} (requires ACTIVE)"
             logger.info(
                 "Donor %s excluded from matching: verification status is %s.",
                 donor_id, status

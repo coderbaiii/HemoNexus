@@ -102,8 +102,8 @@ def run_matching_pipeline(request_data, candidate_donors, sorting_preference=Non
     if not step2:
         return []
 
-    # Step 3: Verification Check (Dynamic 6-month verification check against now)
-    step3 = filter_by_verification_status(step2, current_dt=now, grace_days=Config.GRACE_PERIOD_DAYS)
+    # Step 3: Verification Check (Dynamic check against runtime interval from DB)
+    step3 = filter_by_verification_status(step2, current_dt=now, grace_days=None)
     if not step3:
         return []
 

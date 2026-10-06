@@ -493,7 +493,8 @@ def create_app(config_class=Config):
                     "city": d.get("location") or "Kolkata",
                     "area": d.get("location") or "Kolkata",
                     "distanceKm": 3.5,
-                    "status": "available" if d.get("profile_status") == "ACTIVE" else "cooldown",
+                    "profile_status": d.get("profile_status", "ACTIVE"),
+                    "status": "available" if d.get("profile_status") == "ACTIVE" else ("inactive" if d.get("profile_status") == "INACTIVE" else "cooldown"),
                     "verified": bool(d.get("last_verified_date")),
                     "lastDonatedDate": d.get("last_verified_date") or "2026-09-01",
                     "totalDonations": 5,
@@ -697,17 +698,23 @@ def create_app(config_class=Config):
 
     @app.route('/api/donors')
     def api_donors():
-        """Returns verified real donors from SQLite."""
+        """Returns verified real donors from SQLite (active by default, unless status filter passed)."""
         conn = get_db()
+        status_param = request.args.get('status', 'ACTIVE')
         sql = """
             SELECT d.id, d.user_id, d.blood_group, d.location, d.availability,
                    d.maximum_travel_distance, d.profile_status, d.last_verified_date,
                    u.full_name AS name, u.phone, u.email
             FROM donor_profiles d
             JOIN users u ON d.user_id = u.id
-            ORDER BY d.id ASC
         """
-        donors = query_db(sql, db=conn)
+        params = []
+        if status_param and status_param.upper() != 'ALL':
+            sql += " WHERE d.profile_status = ?"
+            params.append(status_param.upper())
+
+        sql += " ORDER BY d.id ASC"
+        donors = query_db(sql, params, db=conn)
         return jsonify({"success": True, "donors": donors}), 200
 
     @app.route('/api/notifications')

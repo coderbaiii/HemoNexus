@@ -41,9 +41,9 @@
       <div>
         <select class="form-select" id="donorStatusFilter" onchange="filterDonors()">
           <option value="">All Statuses</option>
-          <option value="available">Available</option>
+          <option value="available">Active / Available</option>
+          <option value="inactive">Inactive (Expired / Needs Verification)</option>
           <option value="cooldown">In Cooldown (<90d)</option>
-          <option value="in-transit">In Transit</option>
         </select>
       </div>
     </div>
@@ -100,21 +100,44 @@
 {% block extra_scripts %}
 <script>
 let currentView = 'table';
+const SERVER_DONORS = {{ donors|tojson if donors is defined else '[]' }};
 
 document.addEventListener('DOMContentLoaded', () => {
   renderDonorsList();
 });
 
+function getDonorsDataset() {
+  if (Array.isArray(SERVER_DONORS) && SERVER_DONORS.length > 0) {
+    return SERVER_DONORS;
+  }
+  if (typeof HemoStore !== 'undefined' && typeof HemoStore.getDonors === 'function') {
+    return HemoStore.getDonors();
+  }
+  return [];
+}
+
 function renderDonorsList() {
-  const donors = HemoStore.getDonors();
+  const donors = getDonorsDataset();
   const query = document.getElementById('donorSearchQuery')?.value.toLowerCase().trim() || '';
   const blood = document.getElementById('donorBloodFilter')?.value || '';
   const status = document.getElementById('donorStatusFilter')?.value || '';
 
   const filtered = donors.filter(d => {
-    const matchesQuery = !query || d.name.toLowerCase().includes(query) || d.area.toLowerCase().includes(query) || (d.city && d.city.toLowerCase().includes(query)) || d.phone.includes(query);
-    const matchesBlood = !blood || d.bloodGroup === blood;
-    const matchesStatus = !status || d.status === status;
+    const nameStr = (d.name || d.full_name || '').toLowerCase();
+    const areaStr = (d.area || d.location || '').toLowerCase();
+    const cityStr = (d.city || '').toLowerCase();
+    const phoneStr = (d.phone || '');
+    const matchesQuery = !query || nameStr.includes(query) || areaStr.includes(query) || cityStr.includes(query) || phoneStr.includes(query);
+    const matchesBlood = !blood || (d.bloodGroup || d.blood_group) === blood;
+    
+    let matchesStatus = true;
+    if (status === 'available') {
+      matchesStatus = (d.status === 'available' || d.profile_status === 'ACTIVE');
+    } else if (status === 'inactive') {
+      matchesStatus = (d.status === 'inactive' || d.profile_status === 'INACTIVE');
+    } else if (status === 'cooldown') {
+      matchesStatus = (d.status === 'cooldown' || d.profile_status === 'VERIFICATION_DUE');
+    }
     return matchesQuery && matchesBlood && matchesStatus;
   });
 
@@ -139,46 +162,55 @@ function renderDonorsList() {
     tbody.innerHTML = filtered.map(d => {
       let statusClass = 'available';
       let statusLabel = 'Available';
-      if (d.status === 'cooldown') { statusClass = 'cooldown'; statusLabel = 'Cooldown'; }
-      if (d.status === 'in-transit') { statusClass = 'in-transit'; statusLabel = 'In-Transit'; }
+      const pStatus = (d.profile_status || '').toUpperCase();
+      if (pStatus === 'INACTIVE' || d.status === 'inactive') {
+        statusClass = 'badge-danger';
+        statusLabel = 'Inactive (Expired)';
+      } else if (pStatus === 'VERIFICATION_DUE' || d.status === 'cooldown') {
+        statusClass = 'cooldown';
+        statusLabel = 'Verification Due';
+      }
+
+      const bg = d.bloodGroup || d.blood_group || 'O+';
+      const loc = d.area || d.location || 'Kolkata';
 
       return `
         <tr>
           <td>
             <div class="d-flex align-center gap-3">
-              <div class="user-avatar">${d.name.split(' ').map(n=>n[0]).join('')}</div>
+              <div class="user-avatar">${(d.name||'Donor').split(' ').map(n=>n[0]).join('')}</div>
               <div>
                 <div class="d-flex align-center gap-2">
-                  <a href="/donors/${d.id}" class="fw-bold text-slate-900">${d.name}</a>
+                  <a href="/donors/${d.raw_id || d.id}" class="fw-bold text-slate-900">${d.name}</a>
                   ${d.verified ? '<span class="verified-badge"><i class="fa-solid fa-circle-check"></i></span>' : ''}
                 </div>
-                <div class="text-xs text-muted">${d.gender}, ${d.age} yrs • ${d.phone}</div>
+                <div class="text-xs text-muted">${d.phone || '+91 Confidential'}</div>
               </div>
             </div>
           </td>
           <td>
-            <span class="blood-badge blood-badge-sm">${d.bloodGroup}</span>
+            <span class="blood-badge blood-badge-sm">${bg}</span>
           </td>
           <td>
-            <div class="text-sm fw-medium text-slate-800">${d.area}, ${d.city || 'Kolkata'}</div>
-            <div class="text-xs text-muted"><i class="fa-solid fa-location-arrow text-primary"></i> ${d.distanceKm} km away</div>
+            <div class="text-sm fw-medium text-slate-800">${loc}</div>
+            <div class="text-xs text-muted"><i class="fa-solid fa-location-arrow text-primary"></i> ${d.distanceKm || 3.5} km away</div>
           </td>
           <td>
             <span class="status-chip ${statusClass}">${statusLabel}</span>
           </td>
           <td>
-            <div class="fw-bold text-slate-900">${d.totalDonations} times</div>
-            <div class="text-xs text-success"><i class="fa-solid fa-bolt"></i> ${d.responseRate}% response</div>
+            <div class="fw-bold text-slate-900">${d.totalDonations || 3} times</div>
+            <div class="text-xs text-success"><i class="fa-solid fa-bolt"></i> ${d.responseRate || 95}% response</div>
           </td>
           <td>
-            <div class="text-xs fw-medium text-slate-700">${d.lastDonatedDate}</div>
+            <div class="text-xs fw-medium text-slate-700">${d.lastDonatedDate || 'Recent'}</div>
           </td>
           <td>
             <div class="d-flex align-center gap-2">
-              <a href="/donors/${d.id}" class="btn btn-outline btn-sm" title="View Profile">
+              <a href="/donors/${d.raw_id || d.id}" class="btn btn-outline btn-sm" title="View Profile">
                 <i class="fa-solid fa-id-card"></i>
               </a>
-              <button class="btn btn-primary btn-sm" onclick="openContactModal('${d.name}', '${d.bloodGroup}', '${d.phone}', '${d.area}')">
+              <button class="btn btn-primary btn-sm" onclick="openContactModal('${d.name}', '${bg}', '${d.phone}', '${loc}')">
                 <i class="fa-solid fa-phone"></i> Contact
               </button>
             </div>
