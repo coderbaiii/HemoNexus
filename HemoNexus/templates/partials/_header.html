@@ -27,10 +27,48 @@
     </a>
 
     <!-- Notifications Bell -->
-    <button class="notification-bell-btn btn btn-icon btn-outline position-relative" title="Live Alerts" onclick="HemoUI.showToast('Urgent Alert', 'Critical O- inventory low at Lilavati Hospital.', 'warning')">
-      <i class="fa-regular fa-bell"></i>
-      <span class="bell-badge position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
-    </button>
+    <div class="notif-bell-wrapper position-relative" id="notifBellWrapper">
+      <button class="notification-bell-btn btn btn-icon btn-outline position-relative"
+              id="notifBellBtn"
+              title="Live Alerts"
+              aria-haspopup="true"
+              aria-expanded="false"
+              onclick="HemoNotif.togglePanel(event)">
+        <i class="fa-regular fa-bell" id="notifBellIcon"></i>
+        <span class="bell-badge position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle d-none"
+              id="notifBadge"
+              aria-label="unread notifications"></span>
+      </button>
+
+      <!-- Notification Dropdown Panel -->
+      <div class="notif-panel card shadow-lg border-0 d-none"
+           id="notifPanel"
+           role="dialog"
+           aria-label="Notifications">
+        <div class="notif-panel-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+          <span class="fw-bold text-sm text-ink">
+            <i class="fa-solid fa-bell me-2 text-crimson"></i>Live Alerts
+          </span>
+          <button class="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                  id="notifMarkAllBtn"
+                  onclick="HemoNotif.markAllRead()"
+                  title="Mark all as read" style="font-size:0.72rem;">
+            Mark all read
+          </button>
+        </div>
+        <div class="notif-list" id="notifList">
+          <div class="notif-empty text-center text-muted py-4 px-3" id="notifEmpty">
+            <i class="fa-regular fa-bell-slash fa-2x mb-2 d-block text-muted"></i>
+            <span style="font-size:0.8rem;">No new alerts</span>
+          </div>
+        </div>
+        <div class="notif-panel-footer border-top text-center py-2">
+          <a href="/emergency" class="text-crimson text-decoration-none" style="font-size:0.75rem;">
+            <i class="fa-solid fa-truck-medical me-1"></i>Emergency SOS
+          </a>
+        </div>
+      </div>
+    </div>
 
     <!-- User Profile Dropdown / Sign In -->
     {% if session.get('user_name') %}

@@ -674,6 +674,98 @@ def create_app(config_class=Config):
         donors = query_db(sql, db=conn)
         return jsonify({"success": True, "donors": donors}), 200
 
+    @app.route('/api/notifications')
+    def api_notifications():
+        """Returns role-aware live notifications for the current logged-in user."""
+        conn = get_db()
+        notifications = []
+        try:
+            role = session.get('role', '')
+            user_id = session.get('user_id')
+
+            # ── 1. Critical / Urgent open blood requests (visible to all logged-in users) ──
+            urgent_sql = """
+                SELECT id, required_blood_group, hospital_name, location, urgency, required_units, created_at
+                FROM blood_requests
+                WHERE status IN ('OPEN', 'PENDING')
+                ORDER BY
+                    CASE urgency WHEN 'CRITICAL' THEN 1 WHEN 'URGENT' THEN 2 ELSE 3 END,
+                    created_at DESC
+                LIMIT 5
+            """
+            urgent_rows = query_db(urgent_sql, db=conn) or []
+            for row in urgent_rows:
+                urg = (row.get('urgency') or 'NORMAL').upper()
+                icon = 'fa-droplet' if urg == 'CRITICAL' else 'fa-heart-pulse'
+                icon_class = 'notif-icon-critical' if urg == 'CRITICAL' else 'notif-icon-warning'
+                notifications.append({
+                    'id': f'req_{row["id"]}',
+                    'type': 'blood_request',
+                    'title': f'{urg.title()} Blood Request — {row["required_blood_group"]}',
+                    'desc': f'{row["required_units"] or 1} unit(s) needed at {row["hospital_name"]}, {row["location"]}',
+                    'icon': icon,
+                    'iconClass': icon_class,
+                    'time': row.get('created_at', '')[:16] if row.get('created_at') else 'Recent',
+                    'read': False
+                })
+
+            # ── 2. Donor-specific: pending requests in their inbox ──
+            if role == 'donor' and user_id:
+                donor_inbox_sql = """
+                    SELECT r.id, r.status, r.created_at,
+                           br.required_blood_group, br.hospital_name, br.location, br.urgency
+                    FROM donor_request_responses r
+                    JOIN blood_requests br ON r.blood_request_id = br.id
+                    WHERE r.donor_id = ? AND r.status = 'PENDING'
+                    ORDER BY r.created_at DESC LIMIT 5
+                """
+                inbox_rows = query_db(donor_inbox_sql, (user_id,), db=conn) or []
+                for row in inbox_rows:
+                    notifications.append({
+                        'id': f'inbox_{row["id"]}',
+                        'type': 'donor_inbox',
+                        'title': f'Donation Request — {row["required_blood_group"]}',
+                        'desc': f'You have a pending request from {row["hospital_name"]}, {row["location"]}',
+                        'icon': 'fa-hand-holding-droplet',
+                        'iconClass': 'notif-icon-primary',
+                        'time': row.get('created_at', '')[:16] if row.get('created_at') else 'Recent',
+                        'read': False
+                    })
+
+            # ── 3. Recent accepted/dispatched responses (latest activity feed) ──
+            recent_sql = """
+                SELECT r.id, r.status, r.created_at,
+                       u.full_name AS donor_name,
+                       br.required_blood_group, br.hospital_name
+                FROM donor_request_responses r
+                JOIN blood_requests br ON r.blood_request_id = br.id
+                JOIN users u ON r.donor_id = u.id
+                WHERE r.status IN ('ACCEPTED', 'DISPATCHED')
+                ORDER BY r.created_at DESC LIMIT 3
+            """
+            recent_rows = query_db(recent_sql, db=conn) or []
+            for row in recent_rows:
+                notifications.append({
+                    'id': f'dispatch_{row["id"]}',
+                    'type': 'dispatch',
+                    'title': 'Donor Dispatch Confirmed',
+                    'desc': f'{row["donor_name"]} accepted {row["required_blood_group"]} request at {row["hospital_name"]}',
+                    'icon': 'fa-circle-check',
+                    'iconClass': 'notif-icon-success',
+                    'time': row.get('created_at', '')[:16] if row.get('created_at') else 'Recent',
+                    'read': False
+                })
+
+        except Exception as e:
+            pass
+
+        unread_count = len([n for n in notifications if not n['read']])
+        return jsonify({
+            'success': True,
+            'notifications': notifications,
+            'unread_count': unread_count
+        }), 200
+
     # ── Error Handlers ───────────────────────────────────────────
 
     @app.errorhandler(400)

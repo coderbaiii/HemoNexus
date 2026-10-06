@@ -782,7 +782,10 @@ const HemoAPI = (() => {
     // 7. Admin Endpoints
     getAdminStats: () => apiFetch('/api/admin/stats', { method: 'GET' }),
     getAdminRequests: () => apiFetch('/api/admin/blood-requests', { method: 'GET' }),
-    getAdminResponses: () => apiFetch('/api/admin/responses', { method: 'GET' })
+    getAdminResponses: () => apiFetch('/api/admin/responses', { method: 'GET' }),
+
+    // 8. Notifications
+    getNotifications: () => apiFetch('/api/notifications', { method: 'GET' })
   };
 })();
 
@@ -805,3 +808,230 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 });
+
+// ── Notification Bell Controller ──────────────────────────────────────────────
+const HemoNotif = (() => {
+  let _notifications = [];
+  let _panelOpen = false;
+  let _allRead = false;
+  let _pollInterval = null;
+
+  // Inject notification panel CSS
+  const injectStyles = () => {
+    if (document.getElementById('hemo-notif-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'hemo-notif-styles';
+    style.textContent = `
+      .notif-bell-wrapper { display: inline-block; }
+      .notif-panel {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        width: 340px;
+        max-height: 420px;
+        display: flex;
+        flex-direction: column;
+        z-index: 9999;
+        border-radius: 12px;
+        overflow: hidden;
+        animation: notifFadeIn 0.18s ease;
+      }
+      @keyframes notifFadeIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .notif-list {
+        overflow-y: auto;
+        flex: 1;
+        max-height: 300px;
+      }
+      .notif-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: default;
+        transition: background 0.15s;
+      }
+      .notif-item:last-child { border-bottom: none; }
+      .notif-item:hover { background: #fafafa; }
+      .notif-item.unread { background: #fff5f5; }
+      .notif-item.unread:hover { background: #ffeaea; }
+      .notif-item-icon {
+        width: 34px; height: 34px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        font-size: 0.8rem;
+      }
+      .notif-icon-critical { background: #fee2e2; color: #dc2626; }
+      .notif-icon-warning  { background: #fef3c7; color: #d97706; }
+      .notif-icon-primary  { background: #dbeafe; color: #2563eb; }
+      .notif-icon-success  { background: #dcfce7; color: #16a34a; }
+      .notif-item-body { flex: 1; min-width: 0; }
+      .notif-item-title {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .notif-item-desc {
+        font-size: 0.72rem;
+        color: #6b7280;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .notif-item-time {
+        font-size: 0.65rem;
+        color: #9ca3af;
+        margin-top: 2px;
+      }
+      .notif-panel-header { background: #fff; }
+      .notif-panel-footer { background: #fafafa; }
+      .text-crimson { color: #dc143c !important; }
+      .bell-badge {
+        width: 10px; height: 10px;
+        display: block;
+        transform: translate(-50%, -50%) !important;
+        top: 6px !important;
+        right: -2px !important;
+        left: auto !important;
+      }
+      @media (max-width: 480px) {
+        .notif-panel { width: 290px; right: -60px; }
+      }
+    `;
+    document.head.appendChild(style);
+  };
+
+  const formatTime = (timeStr) => {
+    if (!timeStr || timeStr === 'Recent') return 'Recent';
+    try {
+      const d = new Date(timeStr.replace(' ', 'T'));
+      const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (diff < 60) return 'Just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    } catch (e) { return timeStr; }
+  };
+
+  const renderPanel = () => {
+    const list = document.getElementById('notifList');
+    const empty = document.getElementById('notifEmpty');
+    if (!list) return;
+
+    // Remove old items (keep empty placeholder)
+    list.querySelectorAll('.notif-item').forEach(el => el.remove());
+
+    if (!_notifications.length || _allRead) {
+      if (empty) empty.classList.remove('d-none');
+      return;
+    }
+    if (empty) empty.classList.add('d-none');
+
+    _notifications.forEach(n => {
+      const item = document.createElement('div');
+      item.className = `notif-item ${n.read ? '' : 'unread'}`;
+      item.dataset.id = n.id;
+      item.innerHTML = `
+        <div class="notif-item-icon ${n.iconClass || 'notif-icon-primary'}">
+          <i class="fa-solid ${n.icon || 'fa-bell'}"></i>
+        </div>
+        <div class="notif-item-body">
+          <div class="notif-item-title">${n.title}</div>
+          <div class="notif-item-desc">${n.desc}</div>
+          <div class="notif-item-time">${formatTime(n.time)}</div>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  };
+
+  const updateBadge = (count) => {
+    const badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    if (count > 0 && !_allRead) {
+      badge.classList.remove('d-none');
+      badge.setAttribute('aria-label', `${count} unread notifications`);
+    } else {
+      badge.classList.add('d-none');
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const data = await HemoAPI.getNotifications();
+      if (data && data.success) {
+        _notifications = data.notifications || [];
+        updateBadge(_allRead ? 0 : data.unread_count || 0);
+        if (_panelOpen) renderPanel();
+      }
+    } catch (e) {
+      // Silently ignore — user may not be logged in
+    }
+  };
+
+  const togglePanel = (event) => {
+    event && event.stopPropagation();
+    const panel = document.getElementById('notifPanel');
+    const btn = document.getElementById('notifBellBtn');
+    if (!panel) return;
+
+    _panelOpen = !_panelOpen;
+    panel.classList.toggle('d-none', !_panelOpen);
+    if (btn) btn.setAttribute('aria-expanded', _panelOpen ? 'true' : 'false');
+
+    if (_panelOpen) {
+      renderPanel();
+      // Close on outside click
+      setTimeout(() => {
+        document.addEventListener('click', closeOnOutside, { once: true });
+      }, 0);
+    }
+  };
+
+  const closeOnOutside = (e) => {
+    const wrapper = document.getElementById('notifBellWrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      closePanel();
+    } else if (_panelOpen) {
+      // Re-attach if click was inside
+      setTimeout(() => {
+        document.addEventListener('click', closeOnOutside, { once: true });
+      }, 0);
+    }
+  };
+
+  const closePanel = () => {
+    const panel = document.getElementById('notifPanel');
+    const btn = document.getElementById('notifBellBtn');
+    if (panel) panel.classList.add('d-none');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    _panelOpen = false;
+  };
+
+  const markAllRead = () => {
+    _allRead = true;
+    _notifications.forEach(n => { n.read = true; });
+    updateBadge(0);
+    renderPanel();
+    HemoUI.showToast('Notifications', 'All alerts marked as read.', 'success');
+  };
+
+  const init = () => {
+    injectStyles();
+    // Initial fetch
+    fetchNotifications();
+    // Poll every 30 seconds
+    _pollInterval = setInterval(fetchNotifications, 30000);
+  };
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  return { togglePanel, markAllRead, fetchNotifications };
+})();
