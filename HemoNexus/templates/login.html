@@ -504,7 +504,7 @@
             <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small" onclick="switchBackToStep1()">Change</button>
           </div>
           
-          <form id="verifyOtpForm" onsubmit="handleVerifyOtpAndReset(event)">
+          <form id="verifyOtpForm" onsubmit="handleVerifyOtpAndReset(event)" autocomplete="off">
             <div class="mb-3 text-start">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <label class="form-label small fw-semibold mb-0">6-Digit Verification Code (OTP) *</label>
@@ -512,7 +512,8 @@
               </div>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-key"></i></span>
-                <input type="text" class="form-control border-start-0 ps-0 fw-bold fs-6" id="forgotOtp"
+                <input type="text" inputmode="numeric" autocomplete="one-time-code"
+                       class="form-control border-start-0 ps-0 fw-bold fs-6" id="forgotOtp"
                        placeholder="e.g. 583921" maxlength="6" pattern="[0-9]{6}" required
                        style="letter-spacing: 4px;">
               </div>
@@ -523,7 +524,8 @@
               <label class="form-label small fw-semibold">New Security Password *</label>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
-                <input type="password" class="form-control border-start-0 ps-0" id="forgotNewPassword"
+                <input type="password" autocomplete="new-password"
+                       class="form-control border-start-0 ps-0" id="forgotNewPassword"
                        placeholder="Minimum 6 characters" minlength="6" required>
               </div>
             </div>
@@ -532,7 +534,8 @@
               <label class="form-label small fw-semibold">Confirm New Password *</label>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-check"></i></span>
-                <input type="password" class="form-control border-start-0 ps-0" id="forgotConfirmPassword"
+                <input type="password" autocomplete="new-password"
+                       class="form-control border-start-0 ps-0" id="forgotConfirmPassword"
                        placeholder="Re-enter new password" minlength="6" required>
               </div>
             </div>
@@ -649,9 +652,17 @@
       const emailTargetEl = document.getElementById('otpTargetEmailText');
       if (emailTargetEl) emailTargetEl.textContent = `Code sent to: ${email}`;
 
-      if (document.getElementById('forgotOtp')) {
-        document.getElementById('forgotOtp').value = '';
-      }
+      const verifyForm = document.getElementById('verifyOtpForm');
+      if (verifyForm) verifyForm.reset();
+      if (document.getElementById('forgotOtp')) document.getElementById('forgotOtp').value = '';
+      if (document.getElementById('forgotNewPassword')) document.getElementById('forgotNewPassword').value = '';
+      if (document.getElementById('forgotConfirmPassword')) document.getElementById('forgotConfirmPassword').value = '';
+      setTimeout(() => {
+        if (verifyForm) verifyForm.reset();
+        if (document.getElementById('forgotOtp')) document.getElementById('forgotOtp').value = '';
+        if (document.getElementById('forgotNewPassword')) document.getElementById('forgotNewPassword').value = '';
+        if (document.getElementById('forgotConfirmPassword')) document.getElementById('forgotConfirmPassword').value = '';
+      }, 60);
 
       if (alertEl) {
         alertEl.className = 'alert alert-success small mb-3';
