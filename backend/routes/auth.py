@@ -288,7 +288,36 @@ This code is valid for 10 minutes. If you did not request this, please ignore th
     """
     msg.add_alternative(html_content, subtype="html")
 
-    # 1. Try port 587 with STARTTLS
+    # If Brevo API key is available, use Brevo HTTPS API (Port 443 - never blocked by cloud firewalls)
+    brevo_api_key = os.environ.get("BREVO_API_KEY")
+    if brevo_api_key:
+        import urllib.request
+        import json
+        payload = {
+            "sender": {"name": "HemoNexus Security", "email": sender_email or "projectdgay@gmail.com"},
+            "to": [{"email": recipient_email, "name": recipient_name}],
+            "subject": "HemoNexus Security: Password Reset Verification Code",
+            "htmlContent": html_content
+        }
+        headers = {
+            "accept": "application/json",
+            "api-key": brevo_api_key.strip(),
+            "content-type": "application/json"
+        }
+        try:
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status in (200, 201, 202):
+                    return True, "Email sent successfully via Brevo HTTPS API."
+        except Exception as e_brevo:
+            print(f"[HemoNexus Brevo Error] {e_brevo}")
+
+    # Fallback to standard SMTP (Port 587/465)
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=8) as server:
             server.starttls()
@@ -296,7 +325,6 @@ This code is valid for 10 minutes. If you did not request this, please ignore th
             server.send_message(msg)
         return True, "Email sent successfully."
     except Exception as e_starttls:
-        # 2. Try port 465 with SSL
         try:
             with smtplib.SMTP_SSL(smtp_server, 465, timeout=8) as server:
                 server.login(sender_email, sender_password)
@@ -352,20 +380,10 @@ def send_otp():
     print(f"[HemoNexus Security] OTP generated for {email}. (Email sent: {sent}, status: {reason})")
 
     if not sent:
-        # Check if failure is due to cloud host firewall blocking outbound SMTP (e.g. Render Free Tier)
-        is_cloud_blocked = "unreachable" in reason.lower() or "101" in reason or "timed out" in reason.lower() or "errno 101" in reason.lower()
-        if is_cloud_blocked:
-            return jsonify({
-                "success": True,
-                "cloud_blocked": True,
-                "dev_otp": otp,
-                "message": f"Cloud Host Notice: Outbound SMTP port is firewalled on Render Free Tier. Verification Code: {otp}"
-            }), 200
-        else:
-            return jsonify({
-                "success": False,
-                "error": f"Email dispatch failed: {reason}. Please check SMTP credentials."
-            }), 503
+        return jsonify({
+            "success": False,
+            "error": f"Email dispatch failed: {reason}. Please check email service configuration."
+        }), 503
 
     return jsonify({
         "success": True,
