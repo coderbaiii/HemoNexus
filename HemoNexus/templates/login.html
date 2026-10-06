@@ -665,8 +665,13 @@
       }, 60);
 
       if (alertEl) {
-        alertEl.className = 'alert alert-success small mb-3';
-        alertEl.innerHTML = `<i class="fa-solid fa-envelope-circle-check me-1"></i> ${data.message}`;
+        if (data.cloud_blocked) {
+          alertEl.className = 'alert alert-warning small mb-3 border-warning';
+          alertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> <strong>Render Free Tier Notice:</strong> Outbound SMTP (port 587/465) is firewalled by the host.<br><div class="mt-1">Generated Verification Code: <strong class="fs-6 text-dark tracking-widest">${data.dev_otp}</strong></div><div class="text-xs text-muted mt-1">Enter this code below to complete security verification.</div>`;
+        } else {
+          alertEl.className = 'alert alert-success small mb-3';
+          alertEl.innerHTML = `<i class="fa-solid fa-envelope-circle-check me-1"></i> ${data.message}`;
+        }
         alertEl.classList.remove('d-none');
       }
 

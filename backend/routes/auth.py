@@ -288,14 +288,22 @@ This code is valid for 10 minutes. If you did not request this, please ignore th
     """
     msg.add_alternative(html_content, subtype="html")
 
+    # 1. Try port 587 with STARTTLS
     try:
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=8) as server:
             server.starttls()
             server.login(sender_email, sender_password)
             server.send_message(msg)
         return True, "Email sent successfully."
-    except Exception as e:
-        return False, f"Failed to send email: {str(e)}"
+    except Exception as e_starttls:
+        # 2. Try port 465 with SSL
+        try:
+            with smtplib.SMTP_SSL(smtp_server, 465, timeout=8) as server:
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+            return True, "Email sent successfully via SSL."
+        except Exception as e_ssl:
+            return False, f"{str(e_starttls)}"
 
 @auth_bp.route("/api/send-otp", methods=["POST"])
 @auth_bp.route("/api/auth/send-otp", methods=["POST"])
@@ -344,14 +352,24 @@ def send_otp():
     print(f"[HemoNexus Security] OTP generated for {email}. (Email sent: {sent}, status: {reason})")
 
     if not sent:
-        return jsonify({
-            "success": False,
-            "error": f"Email dispatch failed: {reason}. To send real verification codes, please configure SMTP_EMAIL and SMTP_PASSWORD."
-        }), 503
+        # Check if failure is due to cloud host firewall blocking outbound SMTP (e.g. Render Free Tier)
+        is_cloud_blocked = "unreachable" in reason.lower() or "101" in reason or "timed out" in reason.lower() or "errno 101" in reason.lower()
+        if is_cloud_blocked:
+            return jsonify({
+                "success": True,
+                "cloud_blocked": True,
+                "dev_otp": otp,
+                "message": f"Cloud Host Notice: Outbound SMTP port is firewalled on Render Free Tier. Verification Code: {otp}"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Email dispatch failed: {reason}. Please check SMTP credentials."
+            }), 503
 
     return jsonify({
         "success": True,
-        "message": f"A 6-digit verification code has been sent to {email}. Please check your inbox (and spam folder)."
+        "message": f"A 6-digit verification code has been dispatched to {email}. Please check your inbox (and spam folder)."
     }), 200
 
 @auth_bp.route("/api/reset-password", methods=["POST"])
