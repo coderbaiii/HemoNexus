@@ -460,51 +460,92 @@
     </div>
 
   </div>
-<!-- Forgot Password Custom Modal -->
+<!-- Forgot Password Custom Modal with 2-Step OTP Verification -->
 <div id="forgotPasswordModal" class="custom-modal d-none">
   <div class="custom-modal-backdrop" onclick="closeForgotPasswordModal()"></div>
   <div class="custom-modal-dialog">
     <div class="custom-modal-content card shadow-lg border-0 rounded-4 overflow-hidden">
       <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4">
         <h5 class="modal-title fw-bold m-0 text-slate-900 fs-6">
-          <i class="fa-solid fa-key text-primary me-2"></i>Reset Your Password
+          <i class="fa-solid fa-shield-halved text-primary me-2"></i>Security Verification & Reset
         </h5>
         <button type="button" class="btn-close" onclick="closeForgotPasswordModal()" aria-label="Close"></button>
       </div>
       <div class="card-body p-4">
-        <p class="text-muted small mb-3">
-          Enter your registered email address and enter a new password to restore account access.
-        </p>
+        
         <div id="forgotAlert" class="alert d-none small mb-3" role="alert"></div>
-        <form id="forgotPasswordForm" onsubmit="handleForgotPassword(event)">
-          <div class="mb-3 text-start">
-            <label class="form-label small fw-semibold">Registered Email Address *</label>
-            <div class="input-group">
-              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
-              <input type="email" class="form-control border-start-0 ps-0" id="forgotEmail" placeholder="e.g. amitav.donor@example.com" required>
+
+        <!-- STEP 1: Enter Email to Request OTP -->
+        <div id="otpStep1">
+          <p class="text-muted small mb-3">
+            Enter your registered account email address. We will generate and dispatch a secure <strong>6-digit verification code</strong> to verify your identity.
+          </p>
+          <form id="requestOtpForm" onsubmit="handleRequestOtp(event)">
+            <div class="mb-3 text-start">
+              <label class="form-label small fw-semibold">Registered Email Address *</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
+                <input type="email" class="form-control border-start-0 ps-0" id="forgotEmail" placeholder="e.g. patient.raj@example.com" required>
+              </div>
             </div>
-          </div>
-          <div class="mb-3 text-start">
-            <label class="form-label small fw-semibold">New Password *</label>
-            <div class="input-group">
-              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
-              <input type="password" class="form-control border-start-0 ps-0" id="forgotNewPassword" placeholder="Minimum 6 characters" minlength="6" required>
+            <div class="d-flex justify-content-end gap-2 pt-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="closeForgotPasswordModal()">Cancel</button>
+              <button type="submit" class="btn btn-primary btn-sm px-3" id="btnSendOtp">
+                <i class="fa-solid fa-paper-plane me-1"></i> Send Verification Code
+              </button>
             </div>
+          </form>
+        </div>
+
+        <!-- STEP 2: Enter OTP & Set New Password -->
+        <div id="otpStep2" class="d-none">
+          <div class="p-2 mb-3 bg-light rounded-3 border d-flex justify-content-between align-items-center">
+            <span class="small text-muted" id="otpTargetEmailText">Code sent to your email</span>
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small" onclick="switchBackToStep1()">Change</button>
           </div>
-          <div class="mb-3 text-start">
-            <label class="form-label small fw-semibold">Confirm New Password *</label>
-            <div class="input-group">
-              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-check"></i></span>
-              <input type="password" class="form-control border-start-0 ps-0" id="forgotConfirmPassword" placeholder="Re-enter new password" minlength="6" required>
+          
+          <form id="verifyOtpForm" onsubmit="handleVerifyOtpAndReset(event)">
+            <div class="mb-3 text-start">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label small fw-semibold mb-0">6-Digit Verification Code (OTP) *</label>
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small" id="btnResendOtp" onclick="handleResendOtp()">Resend Code</button>
+              </div>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-key"></i></span>
+                <input type="text" class="form-control border-start-0 ps-0 fw-bold fs-6" id="forgotOtp"
+                       placeholder="e.g. 583921" maxlength="6" pattern="[0-9]{6}" required
+                       style="letter-spacing: 4px;">
+              </div>
+              <span class="text-xs text-muted" style="font-size: 0.72rem;">Valid for 10 minutes from generation.</span>
             </div>
-          </div>
-          <div class="d-flex justify-content-end gap-2 pt-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="closeForgotPasswordModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm px-3" id="btnSubmitReset">
-              <i class="fa-solid fa-arrow-right me-1"></i> Update Password
-            </button>
-          </div>
-        </form>
+
+            <div class="mb-3 text-start">
+              <label class="form-label small fw-semibold">New Security Password *</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
+                <input type="password" class="form-control border-start-0 ps-0" id="forgotNewPassword"
+                       placeholder="Minimum 6 characters" minlength="6" required>
+              </div>
+            </div>
+
+            <div class="mb-3 text-start">
+              <label class="form-label small fw-semibold">Confirm New Password *</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-check"></i></span>
+                <input type="password" class="form-control border-start-0 ps-0" id="forgotConfirmPassword"
+                       placeholder="Re-enter new password" minlength="6" required>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="closeForgotPasswordModal()">Cancel</button>
+              <button type="submit" class="btn btn-success btn-sm px-3" id="btnVerifyReset">
+                <i class="fa-solid fa-circle-check me-1"></i> Verify & Update Password
+              </button>
+            </div>
+          </form>
+        </div>
+
       </div>
     </div>
   </div>
@@ -542,11 +583,14 @@
 
 {% block extra_js %}
 <script>
+  let activeResetEmail = '';
+
   function openForgotPasswordModal() {
     const emailVal = document.getElementById('loginEmail')?.value || '';
     if (emailVal && document.getElementById('forgotEmail')) {
       document.getElementById('forgotEmail').value = emailVal;
     }
+    switchBackToStep1();
     const modal = document.getElementById('forgotPasswordModal');
     if (modal) modal.classList.remove('d-none');
     const alertEl = document.getElementById('forgotAlert');
@@ -560,13 +604,96 @@
     if (alertEl) alertEl.classList.add('d-none');
   }
 
-  async function handleForgotPassword(e) {
-    e.preventDefault();
+  function switchBackToStep1() {
+    document.getElementById('otpStep1')?.classList.remove('d-none');
+    document.getElementById('otpStep2')?.classList.add('d-none');
+    const alertEl = document.getElementById('forgotAlert');
+    if (alertEl) alertEl.classList.add('d-none');
+  }
+
+  async function handleRequestOtp(e) {
+    if (e) e.preventDefault();
     const email = document.getElementById('forgotEmail')?.value?.trim();
+    const alertEl = document.getElementById('forgotAlert');
+    const btn = document.getElementById('btnSendOtp');
+
+    if (!email) {
+      if (alertEl) {
+        alertEl.className = 'alert alert-danger small mb-3';
+        alertEl.textContent = 'Please enter your registered email address.';
+        alertEl.classList.remove('d-none');
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending Code...';
+    }
+
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to dispatch verification code.');
+      }
+
+      activeResetEmail = email;
+      // Switch to Step 2
+      document.getElementById('otpStep1')?.classList.add('d-none');
+      document.getElementById('otpStep2')?.classList.remove('d-none');
+      const emailTargetEl = document.getElementById('otpTargetEmailText');
+      if (emailTargetEl) emailTargetEl.textContent = `Code sent to: ${email}`;
+
+      // Pre-fill dev_otp if in preview mode
+      if (data.dev_otp && document.getElementById('forgotOtp')) {
+        document.getElementById('forgotOtp').value = data.dev_otp;
+      }
+
+      if (alertEl) {
+        alertEl.className = 'alert alert-success small mb-3';
+        alertEl.innerHTML = `<i class="fa-solid fa-envelope-circle-check me-1"></i> ${data.message}`;
+        alertEl.classList.remove('d-none');
+      }
+
+    } catch (err) {
+      if (alertEl) {
+        alertEl.className = 'alert alert-danger small mb-3';
+        alertEl.textContent = err.message || 'Error sending verification code.';
+        alertEl.classList.remove('d-none');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Send Verification Code';
+      }
+    }
+  }
+
+  function handleResendOtp() {
+    handleRequestOtp(null);
+  }
+
+  async function handleVerifyOtpAndReset(e) {
+    e.preventDefault();
+    const otp = document.getElementById('forgotOtp')?.value?.trim();
     const newPass = document.getElementById('forgotNewPassword')?.value;
     const confirmPass = document.getElementById('forgotConfirmPassword')?.value;
     const alertEl = document.getElementById('forgotAlert');
-    const btn = document.getElementById('btnSubmitReset');
+    const btn = document.getElementById('btnVerifyReset');
+
+    if (!otp || otp.length !== 6) {
+      if (alertEl) {
+        alertEl.className = 'alert alert-danger small mb-3';
+        alertEl.textContent = 'Please enter the complete 6-digit verification code.';
+        alertEl.classList.remove('d-none');
+      }
+      return;
+    }
 
     if (newPass !== confirmPass) {
       if (alertEl) {
@@ -579,45 +706,49 @@
 
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Updating...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Verifying Code...';
     }
 
     try {
       const res = await fetch('/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, password: newPass })
+        body: JSON.stringify({
+          email: activeResetEmail,
+          otp: otp,
+          password: newPass
+        })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to reset password.');
+        throw new Error(data.error || 'Verification failed.');
       }
 
       if (alertEl) {
         alertEl.className = 'alert alert-success small mb-3';
-        alertEl.textContent = data.message || 'Password successfully updated! You can now sign in.';
+        alertEl.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> ${data.message || 'Identity verified & password updated successfully!'}`;
         alertEl.classList.remove('d-none');
       }
 
       setTimeout(() => {
         closeForgotPasswordModal();
-        if (document.getElementById('loginEmail')) document.getElementById('loginEmail').value = email;
+        if (document.getElementById('loginEmail')) document.getElementById('loginEmail').value = activeResetEmail;
         if (document.getElementById('loginPassword')) document.getElementById('loginPassword').value = newPass;
         if (typeof HemoUI !== 'undefined' && HemoUI.showToast) {
-          HemoUI.showToast('Password Updated', 'Your password has been reset. Please click Sign In.', 'success');
+          HemoUI.showToast('Security Verified', 'Your password has been updated! Please click Sign In.', 'success');
         }
-      }, 1400);
+      }, 1500);
 
     } catch (err) {
       if (alertEl) {
         alertEl.className = 'alert alert-danger small mb-3';
-        alertEl.textContent = err.message || 'Error resetting password.';
+        alertEl.textContent = err.message || 'Error verifying code.';
         alertEl.classList.remove('d-none');
       }
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-arrow-right me-1"></i> Update Password';
+        btn.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> Verify & Update Password';
       }
     }
   }

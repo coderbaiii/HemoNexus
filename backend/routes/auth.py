@@ -1,4 +1,8 @@
 import re
+import os
+import random
+import smtplib
+from email.message import EmailMessage
 import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, session
@@ -230,41 +234,198 @@ def list_users():
     users = query_db("SELECT id, full_name, email, role, created_at, updated_at FROM users ORDER BY id ASC", db=conn)
     return jsonify({"success": True, "users": users}), 200
 
+def send_otp_email(recipient_email, otp_code, recipient_name="User"):
+    """
+    Sends a 6-digit OTP email using configured SMTP settings.
+    Supports Gmail, Outlook, or custom SMTP server via environment variables:
+    SMTP_SERVER, SMTP_PORT, SMTP_EMAIL, SMTP_PASSWORD.
+    """
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    sender_email = os.environ.get("SMTP_EMAIL") or os.environ.get("MAIL_USERNAME")
+    sender_password = os.environ.get("SMTP_PASSWORD") or os.environ.get("MAIL_PASSWORD")
+
+    if not sender_email or not sender_password:
+        return False, "SMTP credentials not configured."
+
+    msg = EmailMessage()
+    msg["Subject"] = "HemoNexus Security: Password Reset Verification Code"
+    msg["From"] = f"HemoNexus Security <{sender_email}>"
+    msg["To"] = recipient_email
+
+    msg.set_content(f"""Hello {recipient_name},
+
+Your HemoNexus password reset verification code is: {otp_code}
+
+This code is valid for 10 minutes. If you did not request this, please ignore this email.
+
+— Team HemoNexus
+""")
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 24px; color: #1e293b;">
+      <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #e11d48; margin: 0; font-size: 24px; font-weight: 800;">🩸 HemoNexus</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0;">Smart Blood Donor Network</p>
+        </div>
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: #0f172a;">Password Reset Verification</h3>
+        <p style="font-size: 14px; line-height: 1.5; color: #475569;">Hello <strong>{recipient_name}</strong>,</p>
+        <p style="font-size: 14px; line-height: 1.5; color: #475569;">You recently requested to reset your account password. Enter the 6-digit verification code below to verify your identity:</p>
+        <div style="text-align: center; margin: 24px 0;">
+          <div style="display: inline-block; background: #fef2f2; border: 2px dashed #e11d48; padding: 12px 28px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #e11d48; border-radius: 8px;">
+            {otp_code}
+          </div>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; text-align: center;">This verification code will expire in <strong>10 minutes</strong>.</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+        <p style="font-size: 12px; color: #64748b; margin: 0;">If you did not request this password reset, please ignore this email or secure your account.</p>
+      </div>
+    </body>
+    </html>
+    """
+    msg.add_alternative(html_content, subtype="html")
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        return True, "Email sent successfully."
+    except Exception as e:
+        return False, f"Failed to send email: {str(e)}"
+
+@auth_bp.route("/api/send-otp", methods=["POST"])
+@auth_bp.route("/api/auth/send-otp", methods=["POST"])
+def send_otp():
+    """Generates and sends a 6-digit OTP verification code to registered email."""
+    data = request.get_json(silent=True) or request.form.to_dict()
+    email = (data.get("email") or "").strip().lower()
+
+    if not email:
+        return jsonify({"success": False, "error": "Email address is required."}), 400
+
+    conn = get_db()
+    # Check if user exists
+    user = query_db("SELECT id, full_name, email FROM users WHERE email = ?", (email,), one=True, db=conn)
+    if not user:
+        return jsonify({"success": False, "error": f"No account found with email '{email}'."}), 404
+
+    # Generate random 6-digit code
+    otp = f"{random.randint(100000, 999999)}"
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expires_at = (now + datetime.timedelta(minutes=10)).isoformat()
+    now_iso = now.isoformat()
+
+    # Save to password_reset_tokens table (upsert)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            otp_code TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+    """)
+    conn.commit()
+
+    execute_db(
+        """INSERT INTO password_reset_tokens (email, otp_code, expires_at, created_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(email) DO UPDATE SET otp_code=excluded.otp_code, expires_at=excluded.expires_at, created_at=excluded.created_at""",
+        (email, otp, expires_at, now_iso),
+        db=conn
+    )
+
+    # Attempt to send email
+    sent, reason = send_otp_email(email, otp, recipient_name=user["full_name"])
+    print(f"[HemoNexus Security] OTP for {email}: {otp} (Email sent: {sent}, {reason})")
+
+    resp = {
+        "success": True,
+        "message": f"A 6-digit verification code has been sent to {email}.",
+        "email_sent": sent
+    }
+
+    # If SMTP is not configured in environment, provide dev_otp so development/testing works seamlessly
+    sender_email = os.environ.get("SMTP_EMAIL") or os.environ.get("MAIL_USERNAME")
+    if not sent or not sender_email:
+        resp["dev_otp"] = otp
+        resp["message"] = f"Verification code generated. (Dev preview: code is {otp})"
+
+    return jsonify(resp), 200
+
 @auth_bp.route("/api/reset-password", methods=["POST"])
 @auth_bp.route("/api/auth/reset-password", methods=["POST"])
 def reset_password():
-    """Self-service password reset endpoint."""
+    """Self-service password reset with mandatory OTP verification."""
     data = request.get_json(silent=True) or request.form.to_dict()
     email = (data.get("email") or "").strip().lower()
+    otp_provided = (data.get("otp") or "").strip()
     new_password = data.get("password") or data.get("new_password") or ""
 
-    if not email or not new_password:
-        return jsonify({"success": False, "error": "Email and new password are required."}), 400
+    if not email:
+        return jsonify({"success": False, "error": "Email is required."}), 400
+
+    if not otp_provided:
+        return jsonify({"success": False, "error": "6-digit verification code is required."}), 400
+
+    if not new_password:
+        return jsonify({"success": False, "error": "New password is required."}), 400
 
     if len(new_password) < 6:
         return jsonify({"success": False, "error": "Password must be at least 6 characters long."}), 400
 
     conn = get_db()
+    # 1. Verify user exists
     user = query_db("SELECT id, full_name, email FROM users WHERE email = ?", (email,), one=True, db=conn)
     if not user:
         return jsonify({"success": False, "error": f"No account found with email '{email}'."}), 404
 
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # 2. Check token in password_reset_tokens
+    token_row = query_db("SELECT * FROM password_reset_tokens WHERE email = ?", (email,), one=True, db=conn)
+    if not token_row:
+        return jsonify({"success": False, "error": "No pending verification code found. Please click 'Send Verification Code'."}), 400
+
+    # 3. Check expiration
+    now = datetime.datetime.now(datetime.timezone.utc)
+    try:
+        exp_dt = datetime.datetime.fromisoformat(token_row["expires_at"].replace("Z", "+00:00"))
+        if exp_dt.tzinfo is None:
+            exp_dt = exp_dt.replace(tzinfo=datetime.timezone.utc)
+        if now > exp_dt:
+            return jsonify({"success": False, "error": "Verification code has expired. Please request a new code."}), 400
+    except Exception:
+        pass
+
+    # 4. Check OTP match
+    if token_row["otp_code"].strip() != otp_provided:
+        return jsonify({"success": False, "error": "Invalid verification code. Please check your email and try again."}), 400
+
+    # 5. OTP is valid! Update password
+    now_iso = now.isoformat()
     hashed = generate_password_hash(new_password)
     execute_db(
         "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
-        (hashed, now, user["id"]),
+        (hashed, now_iso, user["id"]),
         db=conn
     )
 
+    # Delete used token
+    execute_db("DELETE FROM password_reset_tokens WHERE email = ?", (email,), db=conn)
+
+    # Audit log
     execute_db(
         "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
-        (user["id"], "PASSWORD_RESET", f"Password reset for {user['email']}"),
+        (user["id"], "PASSWORD_RESET_OTP_VERIFIED", f"Password reset verified via OTP for {user['email']}"),
         db=conn
     )
 
     return jsonify({
         "success": True,
-        "message": f"Password for {user['full_name']} has been successfully reset. You can now sign in."
+        "message": f"Password for {user['full_name']} has been successfully updated! You can now sign in."
     }), 200
+
 
