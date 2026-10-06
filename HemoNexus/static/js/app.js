@@ -813,8 +813,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 const HemoNotif = (() => {
   let _notifications = [];
   let _panelOpen = false;
-  let _allRead = false;
   let _pollInterval = null;
+
+  const STORAGE_KEY = 'hemo_read_notif_ids';
+
+  const getReadIds = () => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const saveReadId = (id) => {
+    try {
+      const readIds = new Set(getReadIds());
+      readIds.add(id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(readIds)));
+    } catch (e) {}
+  };
+
+  const saveAllReadIds = (ids) => {
+    try {
+      const readIds = new Set(getReadIds());
+      ids.forEach(id => readIds.add(id));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(readIds)));
+    } catch (e) {}
+  };
 
   // Inject notification panel CSS
   const injectStyles = () => {
@@ -925,19 +950,26 @@ const HemoNotif = (() => {
     const empty = document.getElementById('notifEmpty');
     if (!list) return;
 
-    // Remove old items (keep empty placeholder)
     list.querySelectorAll('.notif-item').forEach(el => el.remove());
 
-    if (!_notifications.length || _allRead) {
+    if (!_notifications.length) {
       if (empty) empty.classList.remove('d-none');
       return;
     }
     if (empty) empty.classList.add('d-none');
 
+    const readSet = new Set(getReadIds());
+
     _notifications.forEach(n => {
+      const isUnread = !readSet.has(n.id);
       const item = document.createElement('div');
-      item.className = `notif-item ${n.read ? '' : 'unread'}`;
+      item.className = `notif-item ${isUnread ? 'unread' : ''}`;
       item.dataset.id = n.id;
+      item.onclick = () => {
+        saveReadId(n.id);
+        item.classList.remove('unread');
+        recalcBadge();
+      };
       item.innerHTML = `
         <div class="notif-item-icon ${n.iconClass || 'notif-icon-primary'}">
           <i class="fa-solid ${n.icon || 'fa-bell'}"></i>
@@ -952,10 +984,16 @@ const HemoNotif = (() => {
     });
   };
 
+  const recalcBadge = () => {
+    const readSet = new Set(getReadIds());
+    const unreadCount = _notifications.filter(n => !readSet.has(n.id)).length;
+    updateBadge(unreadCount);
+  };
+
   const updateBadge = (count) => {
     const badge = document.getElementById('notifBadge');
     if (!badge) return;
-    if (count > 0 && !_allRead) {
+    if (count > 0) {
       badge.classList.remove('d-none');
       badge.setAttribute('aria-label', `${count} unread notifications`);
     } else {
@@ -968,11 +1006,11 @@ const HemoNotif = (() => {
       const data = await HemoAPI.getNotifications();
       if (data && data.success) {
         _notifications = data.notifications || [];
-        updateBadge(_allRead ? 0 : data.unread_count || 0);
+        recalcBadge();
         if (_panelOpen) renderPanel();
       }
     } catch (e) {
-      // Silently ignore — user may not be logged in
+      // Silently ignore
     }
   };
 
@@ -988,7 +1026,6 @@ const HemoNotif = (() => {
 
     if (_panelOpen) {
       renderPanel();
-      // Close on outside click
       setTimeout(() => {
         document.addEventListener('click', closeOnOutside, { once: true });
       }, 0);
@@ -1000,7 +1037,6 @@ const HemoNotif = (() => {
     if (wrapper && !wrapper.contains(e.target)) {
       closePanel();
     } else if (_panelOpen) {
-      // Re-attach if click was inside
       setTimeout(() => {
         document.addEventListener('click', closeOnOutside, { once: true });
       }, 0);
@@ -1016,8 +1052,8 @@ const HemoNotif = (() => {
   };
 
   const markAllRead = () => {
-    _allRead = true;
-    _notifications.forEach(n => { n.read = true; });
+    const allIds = _notifications.map(n => n.id);
+    saveAllReadIds(allIds);
     updateBadge(0);
     renderPanel();
     HemoUI.showToast('Notifications', 'All alerts marked as read.', 'success');
@@ -1025,9 +1061,7 @@ const HemoNotif = (() => {
 
   const init = () => {
     injectStyles();
-    // Initial fetch
     fetchNotifications();
-    // Poll every 30 seconds
     _pollInterval = setInterval(fetchNotifications, 30000);
   };
 

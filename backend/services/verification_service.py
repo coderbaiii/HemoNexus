@@ -135,9 +135,18 @@ def sweep_and_update_donor_statuses(db=None):
 
     stats = {"evaluated": len(donors or []), "updated": 0, "active": 0, "verification_due": 0, "inactive": 0}
 
+    interval_days = _get_interval_days()
+    grace_days = _get_grace_days()
+
     for donor in (donors or []):
-        next_dt = parse_iso_datetime(donor["next_verification_date"])
-        calculated_status = compute_lifecycle_status(next_dt, current_dt=now)
+        # Calculate dynamic next_dt based on last_verified_date + current interval
+        last_dt = parse_iso_datetime(donor.get("last_verified_date")) or parse_iso_datetime(donor.get("next_verification_date"))
+        if last_dt:
+            next_dt = last_dt + datetime.timedelta(days=interval_days)
+        else:
+            next_dt = parse_iso_datetime(donor.get("next_verification_date"))
+
+        calculated_status = compute_lifecycle_status(next_dt, current_dt=now, grace_days=grace_days)
 
         if calculated_status == "ACTIVE":
             stats["active"] += 1

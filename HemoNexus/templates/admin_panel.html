@@ -116,9 +116,14 @@
         <span class="badge badge-danger">INACTIVE</span>.
       </p>
 
-      <button class="btn btn-primary" id="runSweepBtn" onclick="AdminPanel.runSweep()">
-        <i class="fa-solid fa-play me-2"></i>Run Sweep Now
-      </button>
+      <div class="d-flex gap-2 flex-wrap align-center">
+        <button class="btn btn-primary" id="runSweepBtn" onclick="AdminPanel.runSweep()">
+          <i class="fa-solid fa-play me-2"></i>Run Sweep Now
+        </button>
+        <button class="btn btn-outline-success" id="resetDonorsBtn" onclick="AdminPanel.resetDonorsActive()" title="Set all donors to Active with verification timestamp set to now">
+          <i class="fa-solid fa-user-check me-2"></i>Reset All Donors to Active (Start Demo)
+        </button>
+      </div>
 
       <!-- Sweep Results -->
       <div id="sweepResults" class="mt-4 d-none">
@@ -352,6 +357,30 @@ const AdminPanel = (() => {
     btn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Run Sweep Now';
   };
 
+  const resetDonorsActive = async () => {
+    const btn = document.getElementById('resetDonorsBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>Resetting donors...';
+    }
+    try {
+      const res = await fetch('/api/demo/reset-donors-active', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        HemoUI.showToast('Donors Reset', data.message || 'All donors set to ACTIVE now.', 'success');
+        await runSweep();
+      } else {
+        HemoUI.showToast('Error', data.error || 'Failed to reset', 'error');
+      }
+    } catch (e) {
+      HemoUI.showToast('Error', 'Network error', 'error');
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-user-check me-2"></i>Reset All Donors to Active (Start Demo)';
+    }
+  };
+
   // Wire up hint updates
   document.addEventListener('DOMContentLoaded', () => {
     ['intervalValue','intervalUnit','graceValue','graceUnit'].forEach(id => {
@@ -362,7 +391,7 @@ const AdminPanel = (() => {
     loadSettings();
   });
 
-  return { saveSettings, resetToDefault, runSweep, setPreset };
+  return { saveSettings, resetToDefault, runSweep, setPreset, resetDonorsActive };
 })();
 </script>
 {% endblock %}

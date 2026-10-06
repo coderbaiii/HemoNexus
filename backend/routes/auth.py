@@ -104,9 +104,15 @@ def register():
         avail = data.get("availability", "24_HOURS")
         max_dist = float(data.get("maximum_travel_distance") or 15.0)
         
-        # Calculate 6-month verification dates
+        # Calculate verification dates using runtime interval setting
         now_dt = datetime.datetime.now(datetime.timezone.utc)
-        next_due = (now_dt + datetime.timedelta(days=Config.VERIFICATION_INTERVAL_DAYS)).isoformat()
+        try:
+            from backend.app import get_system_setting
+            interval_sec = get_system_setting("verification_interval_seconds", db=conn)
+            interval_days = float(interval_sec) / 86400.0 if interval_sec is not None else Config.VERIFICATION_INTERVAL_DAYS
+        except Exception:
+            interval_days = Config.VERIFICATION_INTERVAL_DAYS
+        next_due = (now_dt + datetime.timedelta(days=interval_days)).isoformat()
         
         execute_db(
             """INSERT INTO donor_profiles 

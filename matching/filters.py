@@ -74,36 +74,42 @@ def filter_by_verification_status(candidates, current_dt=None, grace_days=None):
     Does not allow unverified or expired donors to match in emergency searches.
     Uses runtime DB setting for grace_days if not explicitly provided.
     """
-    # Read runtime grace from DB if not provided
-    if grace_days is None:
-        try:
-            from backend.app import get_system_setting, get_db as _get_db
-            conn = _get_db()
-            val = get_system_setting("grace_period_seconds", db=conn)
-            grace_days = float(val) / 86400.0 if val is not None else Config.GRACE_PERIOD_DAYS
-        except Exception:
-            grace_days = Config.GRACE_PERIOD_DAYS
+    # Read runtime interval and grace from DB if not provided
+    try:
+        from backend.app import get_system_setting, get_db as _get_db
+        conn = _get_db()
+        i_val = get_system_setting("verification_interval_seconds", db=conn)
+        interval_days = float(i_val) / 86400.0 if i_val is not None else Config.VERIFICATION_INTERVAL_DAYS
+        if grace_days is None:
+            g_val = get_system_setting("grace_period_seconds", db=conn)
+            grace_days = float(g_val) / 86400.0 if g_val is not None else Config.GRACE_PERIOD_DAYS
+    except Exception:
+        interval_days = Config.VERIFICATION_INTERVAL_DAYS
+        grace_days = grace_days if grace_days is not None else Config.GRACE_PERIOD_DAYS
 
     now = current_dt or datetime.datetime.now(datetime.timezone.utc)
     valid = []
     for d in candidates:
         donor_id = d.get("donor_id") or d.get("id") or d.get("user_id")
-        next_due_str = d.get("next_verification_date")
+        last_due_str = d.get("last_verified_date") or d.get("next_verification_date")
 
-        if not next_due_str:
+        if not last_due_str:
             logger.warning(
-                "Donor %s excluded from matching: next_verification_date is missing.",
+                "Donor %s excluded from matching: verification timestamp is missing.",
                 donor_id
             )
             continue
 
-        next_dt = parse_iso_datetime(next_due_str)
-        if not next_dt:
+        last_dt = parse_iso_datetime(last_due_str)
+        if not last_dt:
             logger.warning(
-                "Donor %s excluded from matching: invalid next_verification_date format '%s'.",
-                donor_id, next_due_str
+                "Donor %s excluded from matching: invalid verification timestamp '%s'.",
+                donor_id, last_due_str
             )
             continue
+
+        # Dynamic expiration = last_verified_date + interval
+        next_dt = last_dt + datetime.timedelta(days=interval_days)
 
         status = compute_lifecycle_status(next_dt, current_dt=now, grace_days=grace_days)
         if status == "ACTIVE":

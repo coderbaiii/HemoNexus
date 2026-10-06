@@ -856,6 +856,40 @@ def create_app(config_class=Config):
             'current_states': [{'id': r['id'], 'name': r['full_name'], 'status': r['profile_status']} for r in after]
         }), 200
 
+    @app.route('/api/demo/reset-donors-active', methods=['POST'])
+    def demo_reset_donors_active():
+        """
+        DEMO HELPER: Resets all donors to ACTIVE with last_verified_date = NOW.
+        Allows testing the 30s/60s expiration cycle repeatedly.
+        """
+        conn = get_db()
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        now_iso = now_dt.isoformat()
+        try:
+            from backend.app import get_system_setting
+            interval_sec = get_system_setting("verification_interval_seconds", db=conn)
+            interval_days = float(interval_sec) / 86400.0 if interval_sec is not None else Config.VERIFICATION_INTERVAL_DAYS
+        except Exception:
+            interval_days = Config.VERIFICATION_INTERVAL_DAYS
+        next_due_iso = (now_dt + datetime.timedelta(days=interval_days)).isoformat()
+
+        conn.execute(
+            "UPDATE donor_profiles SET profile_status = 'ACTIVE', last_verified_date = ?, next_verification_date = ?, updated_at = ?",
+            (now_iso, next_due_iso, now_iso)
+        )
+        conn.commit()
+
+        donors = query_db(
+            "SELECT dp.id, u.full_name, dp.profile_status FROM donor_profiles dp JOIN users u ON dp.user_id = u.id ORDER BY dp.id",
+            db=conn
+        ) or []
+
+        return jsonify({
+            'success': True,
+            'message': f"All {len(donors)} donors reset to ACTIVE. Expiration window started now.",
+            'donors': donors
+        }), 200
+
     @app.route('/api/donor/verification-status', methods=['GET'])
     def get_my_verification_status():
         """Returns own verification lifecycle status for logged-in donor."""
