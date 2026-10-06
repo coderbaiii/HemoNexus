@@ -229,3 +229,42 @@ def list_users():
     conn = get_db()
     users = query_db("SELECT id, full_name, email, role, created_at, updated_at FROM users ORDER BY id ASC", db=conn)
     return jsonify({"success": True, "users": users}), 200
+
+@auth_bp.route("/api/reset-password", methods=["POST"])
+@auth_bp.route("/api/auth/reset-password", methods=["POST"])
+def reset_password():
+    """Self-service password reset endpoint."""
+    data = request.get_json(silent=True) or request.form.to_dict()
+    email = (data.get("email") or "").strip().lower()
+    new_password = data.get("password") or data.get("new_password") or ""
+
+    if not email or not new_password:
+        return jsonify({"success": False, "error": "Email and new password are required."}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"success": False, "error": "Password must be at least 6 characters long."}), 400
+
+    conn = get_db()
+    user = query_db("SELECT id, full_name, email FROM users WHERE email = ?", (email,), one=True, db=conn)
+    if not user:
+        return jsonify({"success": False, "error": f"No account found with email '{email}'."}), 404
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    hashed = generate_password_hash(new_password)
+    execute_db(
+        "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+        (hashed, now, user["id"]),
+        db=conn
+    )
+
+    execute_db(
+        "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
+        (user["id"], "PASSWORD_RESET", f"Password reset for {user['email']}"),
+        db=conn
+    )
+
+    return jsonify({
+        "success": True,
+        "message": f"Password for {user['full_name']} has been successfully reset. You can now sign in."
+    }), 200
+

@@ -358,8 +358,8 @@
             <div class="mb-3">
               <div class="d-flex justify-content-between align-center mb-1">
                 <label for="loginPassword" class="form-label small fw-semibold mb-0">Password *</label>
-                <a href="#" class="small text-decoration-none"
-                   onclick="HemoUI.showToast('Password Reset', 'Password recovery instructions sent to registered contact.', 'info'); return false;">Forgot?</a>
+                <a href="javascript:void(0)" class="small text-decoration-none"
+                   onclick="openForgotPasswordModal(); return false;">Forgot?</a>
               </div>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
@@ -460,11 +460,168 @@
     </div>
 
   </div>
+<!-- Forgot Password Custom Modal -->
+<div id="forgotPasswordModal" class="custom-modal d-none">
+  <div class="custom-modal-backdrop" onclick="closeForgotPasswordModal()"></div>
+  <div class="custom-modal-dialog">
+    <div class="custom-modal-content card shadow-lg border-0 rounded-4 overflow-hidden">
+      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4">
+        <h5 class="modal-title fw-bold m-0 text-slate-900 fs-6">
+          <i class="fa-solid fa-key text-primary me-2"></i>Reset Your Password
+        </h5>
+        <button type="button" class="btn-close" onclick="closeForgotPasswordModal()" aria-label="Close"></button>
+      </div>
+      <div class="card-body p-4">
+        <p class="text-muted small mb-3">
+          Enter your registered email address and enter a new password to restore account access.
+        </p>
+        <div id="forgotAlert" class="alert d-none small mb-3" role="alert"></div>
+        <form id="forgotPasswordForm" onsubmit="handleForgotPassword(event)">
+          <div class="mb-3 text-start">
+            <label class="form-label small fw-semibold">Registered Email Address *</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
+              <input type="email" class="form-control border-start-0 ps-0" id="forgotEmail" placeholder="e.g. amitav.donor@example.com" required>
+            </div>
+          </div>
+          <div class="mb-3 text-start">
+            <label class="form-label small fw-semibold">New Password *</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-lock"></i></span>
+              <input type="password" class="form-control border-start-0 ps-0" id="forgotNewPassword" placeholder="Minimum 6 characters" minlength="6" required>
+            </div>
+          </div>
+          <div class="mb-3 text-start">
+            <label class="form-label small fw-semibold">Confirm New Password *</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-check"></i></span>
+              <input type="password" class="form-control border-start-0 ps-0" id="forgotConfirmPassword" placeholder="Re-enter new password" minlength="6" required>
+            </div>
+          </div>
+          <div class="d-flex justify-content-end gap-2 pt-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="closeForgotPasswordModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm px-3" id="btnSubmitReset">
+              <i class="fa-solid fa-arrow-right me-1"></i> Update Password
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
+
+<style>
+.custom-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.custom-modal.d-none { display: none !important; }
+.custom-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+}
+.custom-modal-dialog {
+  position: relative;
+  z-index: 10000;
+  width: 92%;
+  max-width: 440px;
+  animation: modalSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalSlideIn {
+  from { transform: translateY(-20px) scale(0.97); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+  function openForgotPasswordModal() {
+    const emailVal = document.getElementById('loginEmail')?.value || '';
+    if (emailVal && document.getElementById('forgotEmail')) {
+      document.getElementById('forgotEmail').value = emailVal;
+    }
+    const modal = document.getElementById('forgotPasswordModal');
+    if (modal) modal.classList.remove('d-none');
+    const alertEl = document.getElementById('forgotAlert');
+    if (alertEl) alertEl.classList.add('d-none');
+  }
+
+  function closeForgotPasswordModal() {
+    const modal = document.getElementById('forgotPasswordModal');
+    if (modal) modal.classList.add('d-none');
+    const alertEl = document.getElementById('forgotAlert');
+    if (alertEl) alertEl.classList.add('d-none');
+  }
+
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail')?.value?.trim();
+    const newPass = document.getElementById('forgotNewPassword')?.value;
+    const confirmPass = document.getElementById('forgotConfirmPassword')?.value;
+    const alertEl = document.getElementById('forgotAlert');
+    const btn = document.getElementById('btnSubmitReset');
+
+    if (newPass !== confirmPass) {
+      if (alertEl) {
+        alertEl.className = 'alert alert-danger small mb-3';
+        alertEl.textContent = 'Passwords do not match. Please re-enter.';
+        alertEl.classList.remove('d-none');
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Updating...';
+    }
+
+    try {
+      const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: newPass })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to reset password.');
+      }
+
+      if (alertEl) {
+        alertEl.className = 'alert alert-success small mb-3';
+        alertEl.textContent = data.message || 'Password successfully updated! You can now sign in.';
+        alertEl.classList.remove('d-none');
+      }
+
+      setTimeout(() => {
+        closeForgotPasswordModal();
+        if (document.getElementById('loginEmail')) document.getElementById('loginEmail').value = email;
+        if (document.getElementById('loginPassword')) document.getElementById('loginPassword').value = newPass;
+        if (typeof HemoUI !== 'undefined' && HemoUI.showToast) {
+          HemoUI.showToast('Password Updated', 'Your password has been reset. Please click Sign In.', 'success');
+        }
+      }, 1400);
+
+    } catch (err) {
+      if (alertEl) {
+        alertEl.className = 'alert alert-danger small mb-3';
+        alertEl.textContent = err.message || 'Error resetting password.';
+        alertEl.classList.remove('d-none');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-arrow-right me-1"></i> Update Password';
+      }
+    }
+  }
+
   // Update the compact role preview line on role switch
   (function() {
     const previews = {
@@ -472,7 +629,6 @@
       patient: 'Find compatible donors and create blood requests based on your requirements.'
     };
     const origSwitch = HemoAuth.switchRole;
-    // Patch after HemoAuth is defined
     document.addEventListener('DOMContentLoaded', function() {
       const donorBtn   = document.getElementById('toggleDonorBtn');
       const patientBtn = document.getElementById('togglePatientBtn');
