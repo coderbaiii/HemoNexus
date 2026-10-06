@@ -649,9 +649,8 @@
       const emailTargetEl = document.getElementById('otpTargetEmailText');
       if (emailTargetEl) emailTargetEl.textContent = `Code sent to: ${email}`;
 
-      // Pre-fill dev_otp if in preview mode
-      if (data.dev_otp && document.getElementById('forgotOtp')) {
-        document.getElementById('forgotOtp').value = data.dev_otp;
+      if (document.getElementById('forgotOtp')) {
+        document.getElementById('forgotOtp').value = '';
       }
 
       if (alertEl) {

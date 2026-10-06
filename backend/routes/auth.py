@@ -341,21 +341,18 @@ def send_otp():
 
     # Attempt to send email
     sent, reason = send_otp_email(email, otp, recipient_name=user["full_name"])
-    print(f"[HemoNexus Security] OTP for {email}: {otp} (Email sent: {sent}, {reason})")
+    print(f"[HemoNexus Security] OTP generated for {email}. (Email sent: {sent}, status: {reason})")
 
-    resp = {
+    if not sent:
+        return jsonify({
+            "success": False,
+            "error": f"Email dispatch failed: {reason}. To send real verification codes, please configure SMTP_EMAIL and SMTP_PASSWORD."
+        }), 503
+
+    return jsonify({
         "success": True,
-        "message": f"A 6-digit verification code has been sent to {email}.",
-        "email_sent": sent
-    }
-
-    # If SMTP is not configured in environment, provide dev_otp so development/testing works seamlessly
-    sender_email = os.environ.get("SMTP_EMAIL") or os.environ.get("MAIL_USERNAME")
-    if not sent or not sender_email:
-        resp["dev_otp"] = otp
-        resp["message"] = f"Verification code generated. (Dev preview: code is {otp})"
-
-    return jsonify(resp), 200
+        "message": f"A 6-digit verification code has been sent to {email}. Please check your inbox (and spam folder)."
+    }), 200
 
 @auth_bp.route("/api/reset-password", methods=["POST"])
 @auth_bp.route("/api/auth/reset-password", methods=["POST"])
