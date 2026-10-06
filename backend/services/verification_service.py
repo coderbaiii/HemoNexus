@@ -8,6 +8,32 @@ import datetime
 from backend.config import Config
 from backend.database import get_db, query_db, execute_db
 
+def _get_interval_days():
+    """Returns verification interval in days from runtime settings if set, else Config default."""
+    try:
+        # Lazy import to avoid circular dependency
+        from backend.app import get_system_setting, get_db as _get_db
+        conn = _get_db()
+        val = get_system_setting("verification_interval_seconds", db=conn)
+        if val is not None:
+            return float(val) / 86400.0  # convert seconds → days
+    except Exception:
+        pass
+    return Config.VERIFICATION_INTERVAL_DAYS
+
+def _get_grace_days():
+    """Returns grace period in days from runtime settings if set, else Config default."""
+    try:
+        from backend.app import get_system_setting, get_db as _get_db
+        conn = _get_db()
+        val = get_system_setting("grace_period_seconds", db=conn)
+        if val is not None:
+            return float(val) / 86400.0
+    except Exception:
+        pass
+    return Config.GRACE_PERIOD_DAYS
+
+
 def parse_iso_datetime(dt_str):
     """Safely parse an ISO format datetime string into a UTC datetime object."""
     if not dt_str:
@@ -29,8 +55,8 @@ def compute_lifecycle_status(next_verification_dt, current_dt=None, interval_day
     - INACTIVE: current_dt > next_verification_dt + grace_days
     """
     now = current_dt or datetime.datetime.now(datetime.timezone.utc)
-    grace = datetime.timedelta(days=grace_days or Config.GRACE_PERIOD_DAYS)
-    
+    grace = datetime.timedelta(days=grace_days if grace_days is not None else _get_grace_days())
+
     if now <= next_verification_dt:
         return "ACTIVE"
     elif now <= (next_verification_dt + grace):
@@ -48,25 +74,26 @@ def refresh_donor_verification(user_id, phone_confirmed=1, address_confirmed=1,
     Logs checkpoint in donor_verifications and audit_logs.
     """
     conn = db or get_db()
-    days = interval_days or Config.VERIFICATION_INTERVAL_DAYS
+    days = interval_days if interval_days is not None else _get_interval_days()
     now = datetime.datetime.now(datetime.timezone.utc)
     next_due = now + datetime.timedelta(days=days)
+
     
     now_iso = now.isoformat()
     next_due_iso = next_due.isoformat()
     
     execute_db(
-        """UPDATE donors 
+        """UPDATE donor_profiles 
            SET last_verified_date = ?, 
                next_verification_date = ?, 
-               status = 'ACTIVE', 
+               profile_status = 'ACTIVE', 
                updated_at = ?
            WHERE user_id = ?""",
         (now_iso, next_due_iso, now_iso, user_id),
         db=conn
     )
     
-    donor_row = query_db("SELECT id FROM donors WHERE user_id = ?", (user_id,), one=True, db=conn)
+    donor_row = query_db("SELECT id FROM donor_profiles WHERE user_id = ?", (user_id,), one=True, db=conn)
     if donor_row:
         execute_db(
             """INSERT INTO donor_verifications 
@@ -94,42 +121,46 @@ def sweep_and_update_donor_statuses(db=None):
     """
     Scans all donor profiles, checks their verification dates against NOW,
     and updates any status transitions in the database.
-    Does NOT delete inactive records.
+    Does NOT delete inactive records — marks them INACTIVE (excluded from matching).
     Returns summary statistics of the sweep.
     """
     conn = db or get_db()
-    donors = query_db("SELECT id, user_id, status, last_verified_date, next_verification_date FROM donors", db=conn)
-    
+    donors = query_db(
+        "SELECT id, user_id, profile_status, last_verified_date, next_verification_date FROM donor_profiles",
+        db=conn
+    )
+
     now = datetime.datetime.now(datetime.timezone.utc)
     now_iso = now.isoformat()
-    
-    stats = {"evaluated": len(donors), "updated": 0, "active": 0, "verification_due": 0, "inactive": 0}
-    
-    for donor in donors:
+
+    stats = {"evaluated": len(donors or []), "updated": 0, "active": 0, "verification_due": 0, "inactive": 0}
+
+    for donor in (donors or []):
         next_dt = parse_iso_datetime(donor["next_verification_date"])
         calculated_status = compute_lifecycle_status(next_dt, current_dt=now)
-        
+
         if calculated_status == "ACTIVE":
             stats["active"] += 1
         elif calculated_status == "VERIFICATION_DUE":
             stats["verification_due"] += 1
         else:
             stats["inactive"] += 1
-            
-        current_status = donor["status"]
+
+        current_status = donor["profile_status"]
         if calculated_status != current_status:
             execute_db(
-                "UPDATE donors SET status = ?, updated_at = ? WHERE id = ?",
+                "UPDATE donor_profiles SET profile_status = ?, updated_at = ? WHERE id = ?",
                 (calculated_status, now_iso, donor["id"]),
                 db=conn
             )
             execute_db(
                 "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
-                (donor["user_id"], "STATUS_TRANSITION", f"Status changed from {current_status} to {calculated_status}"),
+                (donor["user_id"], "STATUS_TRANSITION",
+                 f"Status changed from {current_status} to {calculated_status} (verification lifecycle sweep)"),
                 db=conn
             )
             stats["updated"] += 1
-            
+
     return stats
 
 def get_donor_verification_details(user_id, db=None):
@@ -138,7 +169,7 @@ def get_donor_verification_details(user_id, db=None):
     """
     conn = db or get_db()
     donor = query_db(
-        "SELECT id, user_id, status, last_verified_date, next_verification_date, updated_at FROM donors WHERE user_id = ?",
+        "SELECT id, user_id, profile_status, last_verified_date, next_verification_date, updated_at FROM donor_profiles WHERE user_id = ?",
         (user_id,),
         one=True,
         db=conn

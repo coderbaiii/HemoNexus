@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Control Panel — HemoNexus{% endblock %}
+
+{% block content %}
+<div id="adminPanelRoot">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">
+        <i class="fa-solid fa-sliders me-2 text-danger"></i>Admin Control Panel
+      </h1>
+      <p class="page-subtitle">Runtime system configuration, verification lifecycle management, and donor status sweep.</p>
+    </div>
+    <div class="page-actions">
+      <span class="badge badge-danger py-2 px-3" style="font-size:0.8rem;">
+        <i class="fa-solid fa-shield-halved me-1"></i>Administrator Access
+      </span>
+    </div>
+  </div>
+
+  <!-- ── SECTION 1: Verification Lifecycle Interval Control ── -->
+  <div class="card mb-5" style="border-left: 4px solid #dc2626;">
+    <div class="card-body p-4">
+      <h2 class="fw-bold mb-1" style="font-size:1.1rem; color:#1a1a2e;">
+        <i class="fa-solid fa-stopwatch me-2 text-danger"></i>Verification Lifecycle Interval
+      </h2>
+      <p class="text-muted mb-4" style="font-size:0.85rem;">
+        Set how long a donor stays <span class="badge badge-success">ACTIVE</span> before moving to
+        <span class="badge badge-warning" style="background:#fef3c7;color:#92400e;">VERIFICATION_DUE</span>, then
+        <span class="badge badge-danger">INACTIVE</span>. Changes take effect <strong>immediately</strong> — no restart required.
+      </p>
+
+      <!-- Current State Display -->
+      <div class="d-flex align-center gap-4 mb-4 flex-wrap">
+        <div class="p-3 rounded-lg border text-center" style="min-width:140px; background:#fafafa;">
+          <div class="text-xs text-muted mb-1">Active Window</div>
+          <div class="fw-bold text-ink" id="displayInterval" style="font-size:1.2rem;">--</div>
+          <div class="text-xs text-muted" id="displayIntervalSec"></div>
+        </div>
+        <div class="p-3 rounded-lg border text-center" style="min-width:140px; background:#fafafa;">
+          <div class="text-xs text-muted mb-1">Grace Period</div>
+          <div class="fw-bold text-ink" id="displayGrace" style="font-size:1.2rem;">--</div>
+          <div class="text-xs text-muted" id="displayGraceSec"></div>
+        </div>
+        <div class="p-3 rounded-lg border text-center" style="min-width:140px; background:#fafafa;">
+          <div class="text-xs text-muted mb-1">Mode</div>
+          <div class="fw-bold" id="displayMode" style="font-size:1rem;">--</div>
+        </div>
+      </div>
+
+      <!-- Interval Setter -->
+      <div class="d-grid gap-3" style="grid-template-columns: 1fr 1fr; max-width:640px;">
+        <!-- Verification Interval -->
+        <div>
+          <label class="fw-semibold mb-1 d-block text-sm">Active Window (interval)</label>
+          <div class="d-flex gap-2 align-center">
+            <input type="number" id="intervalValue" class="form-control" value="120" min="1" style="width:90px;" />
+            <select id="intervalUnit" class="form-control" style="width:110px;">
+              <option value="1">Seconds</option>
+              <option value="60" selected>Minutes</option>
+              <option value="3600">Hours</option>
+              <option value="86400">Days</option>
+            </select>
+          </div>
+          <div class="text-xs text-muted mt-1" id="intervalHint">= 120 seconds</div>
+        </div>
+        <!-- Grace Period -->
+        <div>
+          <label class="fw-semibold mb-1 d-block text-sm">Grace Period (before INACTIVE)</label>
+          <div class="d-flex gap-2 align-center">
+            <input type="number" id="graceValue" class="form-control" value="60" min="0" style="width:90px;" />
+            <select id="graceUnit" class="form-control" style="width:110px;">
+              <option value="1">Seconds</option>
+              <option value="60" selected>Minutes</option>
+              <option value="3600">Hours</option>
+              <option value="86400">Days</option>
+            </select>
+          </div>
+          <div class="text-xs text-muted mt-1" id="graceHint">= 60 seconds</div>
+        </div>
+      </div>
+
+      <!-- Quick Preset Buttons -->
+      <div class="mt-3 d-flex gap-2 flex-wrap">
+        <span class="text-xs fw-bold text-muted me-1 d-flex align-center">Quick set:</span>
+        <button class="btn btn-sm btn-outline" onclick="AdminPanel.setPreset(30, 15)" title="Active: 30s, Grace: 15s">30s / 15s</button>
+        <button class="btn btn-sm btn-outline" onclick="AdminPanel.setPreset(120, 60)" title="Active: 2min, Grace: 1min">2min / 1min</button>
+        <button class="btn btn-sm btn-outline" onclick="AdminPanel.setPreset(300, 60)" title="Active: 5min, Grace: 1min">5min / 1min</button>
+        <button class="btn btn-sm btn-outline" onclick="AdminPanel.setPreset(3600, 1800)" title="Active: 1hr, Grace: 30min">1hr / 30min</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="AdminPanel.resetToDefault()" title="Restore 6 months / 30 days">
+          <i class="fa-solid fa-rotate-left me-1"></i>Restore 6-month default
+        </button>
+      </div>
+
+      <!-- Save Button -->
+      <div class="mt-4">
+        <button class="btn btn-primary" id="saveSettingsBtn" onclick="AdminPanel.saveSettings()">
+          <i class="fa-solid fa-floppy-disk me-2"></i>Apply Settings
+        </button>
+        <span class="text-xs text-muted ms-3" id="saveStatus"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 2: Run Sweep ── -->
+  <div class="card mb-5" style="border-left: 4px solid #0ea5e9;">
+    <div class="card-body p-4">
+      <h2 class="fw-bold mb-1" style="font-size:1.1rem; color:#1a1a2e;">
+        <i class="fa-solid fa-arrows-rotate me-2" style="color:#0ea5e9;"></i>Run Verification Sweep
+      </h2>
+      <p class="text-muted mb-4" style="font-size:0.85rem;">
+        Evaluates all donor profiles against the current interval. Donors whose window has expired will
+        be automatically marked <span class="badge badge-warning" style="background:#fef3c7;color:#92400e;">VERIFICATION_DUE</span> or
+        <span class="badge badge-danger">INACTIVE</span>.
+      </p>
+
+      <button class="btn btn-primary" id="runSweepBtn" onclick="AdminPanel.runSweep()">
+        <i class="fa-solid fa-play me-2"></i>Run Sweep Now
+      </button>
+
+      <!-- Sweep Results -->
+      <div id="sweepResults" class="mt-4 d-none">
+        <div class="d-flex gap-4 mb-3 flex-wrap" id="sweepStats"></div>
+
+        <div id="sweepChangesBlock" class="d-none">
+          <div class="fw-semibold mb-2 text-sm">Status Changes in This Sweep:</div>
+          <div class="table-responsive">
+            <table class="table table-sm" style="font-size:0.82rem;">
+              <thead>
+                <tr>
+                  <th>Donor</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Next Verification</th>
+                </tr>
+              </thead>
+              <tbody id="sweepChangesBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="fw-semibold mt-3 mb-2 text-sm">All Donor Current States:</div>
+        <div class="table-responsive">
+          <table class="table table-sm" style="font-size:0.82rem;">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Status</th></tr>
+            </thead>
+            <tbody id="sweepAllBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const AdminPanel = (() => {
+
+  const statusBadge = (s) => {
+    const map = {
+      ACTIVE: 'badge-success',
+      VERIFICATION_DUE: 'badge-warning',
+      INACTIVE: 'badge-danger'
+    };
+    return `<span class="badge ${map[s] || 'badge-secondary'}" style="${s==='VERIFICATION_DUE'?'background:#fef3c7;color:#92400e;':''}">${s}</span>`;
+  };
+
+  const fmtSeconds = (s) => {
+    s = parseFloat(s);
+    if (s < 60)   return `${s}s`;
+    if (s < 3600) return `${(s/60).toFixed(1)}min`;
+    if (s < 86400) return `${(s/3600).toFixed(1)}h`;
+    return `${(s/86400).toFixed(1)} days`;
+  };
+
+  const updateHints = () => {
+    const iv  = parseFloat(document.getElementById('intervalValue').value) || 0;
+    const iu  = parseFloat(document.getElementById('intervalUnit').value)  || 1;
+    const gv  = parseFloat(document.getElementById('graceValue').value)    || 0;
+    const gu  = parseFloat(document.getElementById('graceUnit').value)     || 1;
+    document.getElementById('intervalHint').textContent = `= ${iv * iu} seconds`;
+    document.getElementById('graceHint').textContent    = `= ${gv * gu} seconds`;
+  };
+
+  const loadSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/settings');
+      const data = await res.json();
+      if (!data.success) return;
+      const s = data.settings;
+
+      document.getElementById('displayInterval').textContent =
+        s.verification_interval_seconds != null
+          ? fmtSeconds(s.verification_interval_seconds)
+          : `${s.verification_interval_days} days (default)`;
+      document.getElementById('displayIntervalSec').textContent =
+        s.verification_interval_seconds != null
+          ? `${s.verification_interval_seconds}s` : '';
+
+      document.getElementById('displayGrace').textContent =
+        s.grace_period_seconds != null
+          ? fmtSeconds(s.grace_period_seconds)
+          : `${s.grace_period_days} days (default)`;
+      document.getElementById('displayGraceSec').textContent =
+        s.grace_period_seconds != null
+          ? `${s.grace_period_seconds}s` : '';
+
+      const modeEl = document.getElementById('displayMode');
+      modeEl.textContent = s.mode === 'custom' ? '🔧 Custom (Demo)' : '📅 Default (6 months)';
+      modeEl.style.color = s.mode === 'custom' ? '#dc2626' : '#16a34a';
+    } catch(e) {}
+  };
+
+  const setPreset = (intervalSec, graceSec) => {
+    document.getElementById('intervalUnit').value = '1';
+    document.getElementById('intervalValue').value = intervalSec;
+    document.getElementById('graceUnit').value = '1';
+    document.getElementById('graceValue').value = graceSec;
+    updateHints();
+    HemoUI.showToast('Preset Loaded', `Interval: ${fmtSeconds(intervalSec)}, Grace: ${fmtSeconds(graceSec)}`, 'info');
+  };
+
+  const saveSettings = async () => {
+    const iv = parseFloat(document.getElementById('intervalValue').value);
+    const iu = parseFloat(document.getElementById('intervalUnit').value);
+    const gv = parseFloat(document.getElementById('graceValue').value);
+    const gu = parseFloat(document.getElementById('graceUnit').value);
+
+    const intervalSec = iv * iu;
+    const graceSec    = gv * gu;
+
+    const btn = document.getElementById('saveSettingsBtn');
+    const statusEl = document.getElementById('saveStatus');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>Applying...';
+
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          verification_interval_seconds: intervalSec,
+          grace_period_seconds: graceSec
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        HemoUI.showToast('Settings Applied', `Active window: ${fmtSeconds(intervalSec)}, Grace: ${fmtSeconds(graceSec)}`, 'success');
+        statusEl.textContent = `✓ Saved at ${new Date().toLocaleTimeString()}`;
+        statusEl.style.color = '#16a34a';
+        await loadSettings();
+      } else {
+        HemoUI.showToast('Error', data.error || 'Failed to save', 'error');
+      }
+    } catch(e) {
+      HemoUI.showToast('Error', 'Network error', 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-2"></i>Apply Settings';
+  };
+
+  const resetToDefault = async () => {
+    if (!confirm('Reset to 6-month / 30-day default? This removes the custom demo timing.')) return;
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reset_to_default: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        HemoUI.showToast('Reset', 'Restored to 6-month default.', 'success');
+        await loadSettings();
+      }
+    } catch(e) {}
+  };
+
+  const runSweep = async () => {
+    const btn = document.getElementById('runSweepBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="heartbeat-spinner me-2"><i class="fa-solid fa-heart-pulse"></i></span>Running sweep...';
+
+    try {
+      const res = await fetch('/api/demo/sweep', { method: 'POST' });
+      const data = await res.json();
+
+      const resultsDiv = document.getElementById('sweepResults');
+      resultsDiv.classList.remove('d-none');
+
+      // Stats bar
+      const s = data.stats || {};
+      document.getElementById('sweepStats').innerHTML = `
+        <div class="p-3 rounded-lg border text-center" style="min-width:110px;background:#f0fdf4;">
+          <div class="text-xs text-muted">Evaluated</div>
+          <div class="fw-bold fs-5">${s.evaluated || 0}</div>
+        </div>
+        <div class="p-3 rounded-lg border text-center" style="min-width:110px;background:#f0fdf4;">
+          <div class="text-xs text-muted">Active</div>
+          <div class="fw-bold fs-5 text-success">${s.active || 0}</div>
+        </div>
+        <div class="p-3 rounded-lg border text-center" style="min-width:110px;background:#fef3c7;">
+          <div class="text-xs text-muted">Verif. Due</div>
+          <div class="fw-bold fs-5" style="color:#92400e;">${s.verification_due || 0}</div>
+        </div>
+        <div class="p-3 rounded-lg border text-center" style="min-width:110px;background:#fff1f2;">
+          <div class="text-xs text-muted">Inactive</div>
+          <div class="fw-bold fs-5 text-danger">${s.inactive || 0}</div>
+        </div>
+        <div class="p-3 rounded-lg border text-center" style="min-width:110px;background:#eff6ff;">
+          <div class="text-xs text-muted">Changes</div>
+          <div class="fw-bold fs-5 text-primary">${s.updated || 0}</div>
+        </div>
+      `;
+
+      // Changes table
+      const changesBlock = document.getElementById('sweepChangesBlock');
+      const changesBody  = document.getElementById('sweepChangesBody');
+      if (data.changes && data.changes.length > 0) {
+        changesBlock.classList.remove('d-none');
+        changesBody.innerHTML = data.changes.map(c => `
+          <tr>
+            <td>${c.name}</td>
+            <td>${statusBadge(c.from)}</td>
+            <td>${statusBadge(c.to)}</td>
+            <td style="font-size:0.75rem;color:#6b7280;">${c.next_verification_date ? c.next_verification_date.substring(0,16) : '-'}</td>
+          </tr>
+        `).join('');
+      } else {
+        changesBlock.classList.add('d-none');
+      }
+
+      // All donors table
+      const allBody = document.getElementById('sweepAllBody');
+      allBody.innerHTML = (data.current_states || []).map(d => `
+        <tr>
+          <td>#${d.id}</td>
+          <td>${d.name}</td>
+          <td>${statusBadge(d.status)}</td>
+        </tr>
+      `).join('');
+
+      HemoUI.showToast('Sweep Complete', data.message || 'Done', s.updated > 0 ? 'warning' : 'success');
+    } catch(e) {
+      HemoUI.showToast('Error', 'Sweep failed: ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Run Sweep Now';
+  };
+
+  // Wire up hint updates
+  document.addEventListener('DOMContentLoaded', () => {
+    ['intervalValue','intervalUnit','graceValue','graceUnit'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', updateHints);
+    });
+    updateHints();
+    loadSettings();
+  });
+
+  return { saveSettings, resetToDefault, runSweep, setPreset };
+})();
+</script>
+{% endblock %}

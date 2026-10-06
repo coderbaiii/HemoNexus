@@ -18,7 +18,43 @@ from backend.routes.auth import auth_bp
 from backend.routes.donor import donor_bp
 from backend.routes.patient import patient_bp
 from backend.routes.admin import admin_bp
+from backend.services.verification_service import sweep_and_update_donor_statuses
 
+
+# ── Runtime System Settings (stored in DB, override Config defaults) ──────────
+
+def _ensure_settings_table(conn):
+    """Create system_settings table if it doesn't exist."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.commit()
+
+def get_system_setting(key, default=None, db=None):
+    """Fetch a runtime setting from DB; falls back to default."""
+    conn = db or get_db()
+    try:
+        _ensure_settings_table(conn)
+        row = query_db("SELECT value FROM system_settings WHERE key = ?", (key,), one=True, db=conn)
+        return row["value"] if row else default
+    except Exception:
+        return default
+
+def set_system_setting(key, value, db=None):
+    """Upsert a runtime setting into DB."""
+    conn = db or get_db()
+    _ensure_settings_table(conn)
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    conn.execute(
+        "INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+        (key, str(value), now)
+    )
+    conn.commit()
 
 def get_real_activities(db=None):
     """Fetches real dispatch and emergency activity from the SQLite database."""
@@ -766,7 +802,139 @@ def create_app(config_class=Config):
             'unread_count': unread_count
         }), 200
 
+    # ── Demo / Testing Endpoints ─────────────────────────────────
+
+    @app.route('/api/demo/sweep', methods=['POST', 'GET'])
+    def demo_verification_sweep():
+        """
+        DEMO ENDPOINT: Runs the verification lifecycle sweep without admin login.
+        Marks donors INACTIVE if their next_verification_date + grace has passed.
+        Returns a detailed before/after report for demonstration.
+        """
+        conn = get_db()
+        # Capture state before sweep
+        before = query_db(
+            "SELECT dp.id, u.full_name, dp.profile_status, dp.next_verification_date "
+            "FROM donor_profiles dp JOIN users u ON dp.user_id = u.id ORDER BY dp.id",
+            db=conn
+        ) or []
+
+        stats = sweep_and_update_donor_statuses(db=conn)
+
+        # Capture state after sweep
+        after = query_db(
+            "SELECT dp.id, u.full_name, dp.profile_status, dp.next_verification_date "
+            "FROM donor_profiles dp JOIN users u ON dp.user_id = u.id ORDER BY dp.id",
+            db=conn
+        ) or []
+
+        before_map = {r['id']: r['profile_status'] for r in before}
+        changes = []
+        for row in after:
+            prev = before_map.get(row['id'], '?')
+            if prev != row['profile_status']:
+                changes.append({
+                    'donor_id': row['id'],
+                    'name': row['full_name'],
+                    'from': prev,
+                    'to': row['profile_status'],
+                    'next_verification_date': row['next_verification_date']
+                })
+
+        return jsonify({
+            'success': True,
+            'message': f"Sweep complete: {stats['evaluated']} donors evaluated, {stats['updated']} status changes.",
+            'stats': stats,
+            'changes': changes,
+            'current_states': [{'id': r['id'], 'name': r['full_name'], 'status': r['profile_status']} for r in after]
+        }), 200
+
+    @app.route('/api/donor/verification-status', methods=['GET'])
+    def get_my_verification_status():
+        """Returns own verification lifecycle status for logged-in donor."""
+        from backend.services.verification_service import get_donor_verification_details
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Not logged in'}), 401
+        conn = get_db()
+        details = get_donor_verification_details(user_id, db=conn)
+        if not details:
+            return jsonify({'success': False, 'error': 'No donor profile found'}), 404
+        return jsonify({'success': True, 'verification': details}), 200
+
+    # ── Admin Settings API ───────────────────────────────────────
+
+    @app.route('/api/admin/settings', methods=['GET'])
+    def get_admin_settings():
+        """Returns current runtime system settings (no auth required for demo)."""
+        conn = get_db()
+        interval_sec = get_system_setting('verification_interval_seconds', db=conn)
+        grace_sec    = get_system_setting('grace_period_seconds', db=conn)
+        return jsonify({
+            'success': True,
+            'settings': {
+                'verification_interval_seconds': float(interval_sec) if interval_sec is not None else None,
+                'grace_period_seconds':          float(grace_sec)    if grace_sec    is not None else None,
+                'verification_interval_days':    Config.VERIFICATION_INTERVAL_DAYS,
+                'grace_period_days':             Config.GRACE_PERIOD_DAYS,
+                'mode': 'custom' if interval_sec else 'default'
+            }
+        }), 200
+
+    @app.route('/api/admin/settings', methods=['POST'])
+    def update_admin_settings():
+        """
+        Update runtime verification intervals. Admin-only in production;
+        open for demo. Accepts JSON:
+          { "verification_interval_seconds": N, "grace_period_seconds": M }
+        N and M can be seconds (e.g. 120 = 2 minutes, 30 = 30 seconds).
+        """
+        data = request.get_json(silent=True) or {}
+        conn = get_db()
+        updated = {}
+
+        if 'verification_interval_seconds' in data:
+            val = float(data['verification_interval_seconds'])
+            if val <= 0:
+                return jsonify({'success': False, 'error': 'Interval must be > 0 seconds'}), 400
+            set_system_setting('verification_interval_seconds', val, db=conn)
+            updated['verification_interval_seconds'] = val
+
+        if 'grace_period_seconds' in data:
+            val = float(data['grace_period_seconds'])
+            if val < 0:
+                return jsonify({'success': False, 'error': 'Grace period cannot be negative'}), 400
+            set_system_setting('grace_period_seconds', val, db=conn)
+            updated['grace_period_seconds'] = val
+
+        if 'reset_to_default' in data and data['reset_to_default']:
+            conn.execute("DELETE FROM system_settings WHERE key IN ('verification_interval_seconds','grace_period_seconds')")
+            conn.commit()
+            updated['reset'] = True
+
+        user_id = session.get('user_id', 0)
+        try:
+            execute_db(
+                "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
+                (user_id, "ADMIN_SETTINGS_UPDATE", f"Settings changed: {updated}"),
+                db=conn
+            )
+        except Exception:
+            pass
+
+        return jsonify({'success': True, 'message': 'Settings updated.', 'updated': updated}), 200
+
+    # ── Admin Control Panel Page ─────────────────────────────────
+
+    @app.route('/admin')
+    def admin_panel():
+        """Admin Control Panel — verification lifecycle settings and donor sweep."""
+        if session.get('role') != 'admin':
+            return redirect(url_for('login'))
+        return render_template('admin_panel.html', active_page='admin')
+
     # ── Error Handlers ───────────────────────────────────────────
+
 
     @app.errorhandler(400)
     def bad_request(e):

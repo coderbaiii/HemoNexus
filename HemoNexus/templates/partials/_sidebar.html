@@ -97,7 +97,21 @@
         </li>
       </ul>
     </div>
-  </div>
+
+    {% if session.get('role') == 'admin' %}
+    <div class="mb-4">
+      <div class="sidebar-section-title text-xs fw-bold text-muted text-uppercase letter-spacing-1 mb-2 px-2">Administration</div>
+      <ul class="sidebar-menu list-unstyled m-0 d-flex flex-column gap-1">
+        <li>
+          <a href="/admin" class="sidebar-link {% if active_page == 'admin' %}active{% endif %}" style="color: #dc2626;">
+            <i class="fa-solid fa-sliders" style="color: #dc2626;"></i>
+            <span class="flex-1">Admin Control Panel</span>
+            <span class="badge badge-danger">Admin</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
 
   <!-- Sidebar Footer Status -->
   <div class="sidebar-footer p-3 border-top bg-light">
