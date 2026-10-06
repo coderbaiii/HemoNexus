@@ -340,7 +340,7 @@
             {% endif %}
           {% endwith %}
 
-          <form action="/login" method="POST" id="authLoginForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleLoginSubmit(event)">
+          <form action="/login" method="POST" id="authLoginForm" class="stagger-entrance-4" onsubmit="HemoAuth.handleLoginSubmit(event)" autocomplete="off">
             <input type="hidden" name="userRole" id="authRoleInput" value="{{ active_role or 'donor' }}">
 
             <!-- Email -->
@@ -350,7 +350,7 @@
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
                 <input type="email" class="form-control border-start-0 ps-0" id="loginEmail" name="email"
                        placeholder="e.g. amitav.donor@example.com" value="{{ email or '' }}"
-                       autocomplete="email" required>
+                       autocomplete="off" required>
               </div>
             </div>
 
@@ -366,7 +366,7 @@
                 <input type="password" class="form-control border-start-0 border-end-0 ps-0"
                        id="loginPassword" name="password"
                        placeholder="Enter your security password" value=""
-                       autocomplete="current-password" required>
+                       autocomplete="new-password" required>
                 <button class="btn btn-outline-secondary border-start-0 text-muted"
                         type="button" id="togglePasswordBtn"
                         onclick="HemoAuth.togglePasswordVisibility('loginPassword', this)"
@@ -760,6 +760,12 @@
     };
     const origSwitch = HemoAuth.switchRole;
     document.addEventListener('DOMContentLoaded', function() {
+      // Clear any browser-cached or autofilled inputs on initial load
+      const authForm = document.getElementById('authLoginForm');
+      if (authForm && !new URLSearchParams(window.location.search).get('reset')) {
+        authForm.reset();
+      }
+
       const donorBtn   = document.getElementById('toggleDonorBtn');
       const patientBtn = document.getElementById('togglePatientBtn');
       const previewEl  = document.getElementById('rolePreviewText');
