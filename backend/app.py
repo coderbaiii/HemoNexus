@@ -13,7 +13,7 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from werkzeug.security import generate_password_hash, check_password_hash
 from backend.config import Config
 from backend.database import get_db, close_db, query_db, execute_db
-from backend.init_db import init_database
+from backend.init_db import init_database, sync_admin_credentials
 from backend.routes.auth import auth_bp
 from backend.routes.donor import donor_bp
 from backend.routes.patient import patient_bp
@@ -183,6 +183,11 @@ def create_app(config_class=Config):
                     conn.commit()
                 except Exception:
                     pass
+                # Always sync admin credentials from env vars on every startup
+                try:
+                    sync_admin_credentials(get_db(str(db_path)))
+                except Exception as e:
+                    print("Warning: could not sync admin credentials:", e)
 
     @app.context_processor
     def inject_user():
