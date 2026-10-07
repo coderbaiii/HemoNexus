@@ -540,6 +540,18 @@ code, kbd, samp, pre {
   border: 1px solid rgba(179, 18, 31, 0.2);
 }
 
+.badge-info {
+  background-color: #e0f2fe !important;
+  color: #0369a1 !important;
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.badge-secondary {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1;
+}
+
 .badge-slate {
   background-color: var(--bg-alt) !important;
   color: var(--ink-soft) !important;
