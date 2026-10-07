@@ -301,6 +301,30 @@ CREATE INDEX IF NOT EXISTS idx_donation_records_donor ON donation_records(donor_
 CREATE INDEX IF NOT EXISTS idx_donation_records_request ON donation_records(request_id);
 """
 
+def sync_admin_credentials(conn):
+    """
+    Always runs on startup. Ensures the admin account's password hash in the DB
+    matches the current ADMIN_PASSWORD environment variable. This allows changing
+    the admin password by updating .env and restarting Flask.
+    """
+    admin_email = Config.ADMIN_EMAIL
+    admin_password = Config.ADMIN_PASSWORD
+    admin_pass_hash = generate_password_hash(admin_password)
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE email = ?", (admin_email,))
+    existing = cur.fetchone()
+    if existing:
+        cur.execute(
+            "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+            (admin_pass_hash, now_iso, existing[0])
+        )
+        conn.commit()
+        print(f"Admin credentials synced for {admin_email}.")
+    cur.close()
+
+
 def init_database(db_path=None, seed_demo=True):
     """
     Initializes the SQLite database schema and seeds initial demo/test data.
@@ -312,6 +336,9 @@ def init_database(db_path=None, seed_demo=True):
 
     if seed_demo:
         seed_data(conn)
+
+    # Always sync admin credentials from env vars on every startup
+    sync_admin_credentials(conn)
 
     cur.close()
     if db_path:
