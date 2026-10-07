@@ -408,15 +408,10 @@ def seed_data(conn):
                 "INSERT INTO patient_profiles (user_id, phone, location, latitude, longitude, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (pid, p["phone"], p["loc"], p["lat"], p["lon"], now_iso, now_iso)
             )
-            cur.execute(
-                """INSERT INTO blood_requests 
-                   (patient_id, required_blood_group, required_units, hospital_name, location, latitude, longitude, preferred_max_distance, required_date_time, urgency, request_status, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)""",
-                (pid, p["req_blood"], p["units"], p["hospital"], p["loc"], p["lat"], p["lon"], p["max_dist"], now_iso, p["urgency"], now_iso, now_iso)
-            )
             patient_ids[p["email"]] = pid
         else:
             patient_ids[p["email"]] = p_row[0]
+
 
     # 3. Comprehensive Synthetic Donors across all blood groups & verification states
     demo_donors = [

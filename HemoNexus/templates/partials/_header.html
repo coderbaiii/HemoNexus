@@ -51,10 +51,11 @@
           </span>
           <button class="btn btn-sm btn-link text-muted p-0 text-decoration-none"
                   id="notifMarkAllBtn"
-                  onclick="HemoNotif.markAllRead()"
-                  title="Mark all as read" style="font-size:0.72rem;">
+                  onclick="event.stopPropagation(); HemoNotif.markAllRead(event);"
+                  title="Mark all as read" style="font-size:0.72rem; cursor: pointer;">
             Mark all read
           </button>
+
         </div>
         <div class="notif-list" id="notifList">
           <div class="notif-empty text-center text-muted py-4 px-3" id="notifEmpty">

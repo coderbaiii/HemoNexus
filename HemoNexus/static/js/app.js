@@ -1051,13 +1051,22 @@ const HemoNotif = (() => {
     _panelOpen = false;
   };
 
-  const markAllRead = () => {
+  const markAllRead = (event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     const allIds = _notifications.map(n => n.id);
     saveAllReadIds(allIds);
     updateBadge(0);
+    const list = document.getElementById('notifList');
+    if (list) {
+      list.querySelectorAll('.notif-item').forEach(el => el.classList.remove('unread'));
+    }
     renderPanel();
     HemoUI.showToast('Notifications', 'All alerts marked as read.', 'success');
   };
+
 
   const init = () => {
     injectStyles();

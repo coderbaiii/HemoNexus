@@ -29,18 +29,19 @@
     </div>
   </div>
 
-  <!-- Critical Alert Ticker -->
-  <div class="card mb-6" style="border-left: 4px solid var(--danger); background-color: var(--primary-50);">
+  <!-- Critical Alert Ticker (Dynamic) -->
+  <div class="card mb-6 d-none" id="criticalAlertTicker" style="border-left: 4px solid var(--danger); background-color: var(--primary-50);">
     <div class="card-body p-4 d-flex align-center justify-between flex-wrap gap-3">
       <div class="d-flex align-center gap-3">
         <span class="badge badge-danger"><i class="fa-solid fa-triangle-exclamation"></i> Critical Alert</span>
-        <span class="text-sm fw-bold text-slate-900">Lilavati Hospital ICU urgently requires 3 units of O- Whole Blood (REQ-4091).</span>
+        <span class="text-sm fw-bold text-slate-900" id="criticalAlertText">Critical blood request active.</span>
       </div>
       <a href="/emergency" class="btn btn-emergency btn-sm">
         <i class="fa-solid fa-broadcast-tower"></i> Launch Emergency SOS
       </a>
     </div>
   </div>
+
 
   <!-- KPI Metric Cards Grid -->
   <div class="d-grid grid-4 gap-4 mb-6">
