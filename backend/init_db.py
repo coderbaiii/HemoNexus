@@ -8,6 +8,7 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import os
 import sqlite3
 import datetime
 from werkzeug.security import generate_password_hash
