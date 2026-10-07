@@ -698,9 +698,15 @@ def create_app(config_class=Config):
 
     @app.route('/api/donors')
     def api_donors():
-        """Returns verified real donors from SQLite (active by default, unless status filter passed)."""
+        """Returns verified real donors from SQLite with real-time status sweep."""
         conn = get_db()
-        status_param = request.args.get('status', 'ACTIVE')
+        # Always run sweep to guarantee live status evaluation
+        try:
+            sweep_and_update_donor_statuses(db=conn)
+        except Exception:
+            pass
+
+        status_param = request.args.get('status', 'ALL')
         sql = """
             SELECT d.id, d.user_id, d.blood_group, d.location, d.availability,
                    d.maximum_travel_distance, d.profile_status, d.last_verified_date,
@@ -716,6 +722,7 @@ def create_app(config_class=Config):
         sql += " ORDER BY d.id ASC"
         donors = query_db(sql, params, db=conn)
         return jsonify({"success": True, "donors": donors}), 200
+
 
     @app.route('/api/notifications')
     def api_notifications():
