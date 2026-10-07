@@ -336,19 +336,30 @@ def seed_data(conn):
     past_7mo = (now - datetime.timedelta(days=210)).isoformat()
     past_10mo = (now - datetime.timedelta(days=300)).isoformat()
 
-    # 1. Admin Account
-    cur.execute("SELECT id FROM users WHERE email = ?", ("admin@hemonexus.org",))
-    if not cur.fetchone():
-        admin_pass = generate_password_hash("Admin@123456")
+    # 1. Admin Account (Configurable via ADMIN_EMAIL and ADMIN_PASSWORD environment variables)
+    admin_email = getattr(Config, "ADMIN_EMAIL", os.environ.get("ADMIN_EMAIL", "admin@hemonexus.org"))
+    admin_password = getattr(Config, "ADMIN_PASSWORD", os.environ.get("ADMIN_PASSWORD", "Admin@123456"))
+    admin_pass = generate_password_hash(admin_password)
+
+    cur.execute("SELECT id, password_hash FROM users WHERE email = ?", (admin_email,))
+    existing_admin = cur.fetchone()
+    if not existing_admin:
         cur.execute(
             "INSERT INTO users (full_name, email, phone, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("System Administrator", "admin@hemonexus.org", "+91 90000 00000", admin_pass, "admin", now_iso, now_iso)
+            ("System Administrator", admin_email, "+91 90000 00000", admin_pass, "admin", now_iso, now_iso)
         )
         admin_id = cur.lastrowid
         cur.execute(
             "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
-            (admin_id, "INIT_ADMIN", "Created default admin account")
+            (admin_id, "INIT_ADMIN", f"Created default admin account for {admin_email}")
         )
+    else:
+        # Keep admin password in sync with environment variable
+        cur.execute(
+            "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+            (admin_pass, now_iso, existing_admin[0])
+        )
+
 
     # 2. Synthetic Patients
     demo_patients = [

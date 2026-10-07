@@ -349,7 +349,7 @@
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
                 <input type="email" class="form-control border-start-0 ps-0" id="loginEmail" name="email"
-                       placeholder="e.g. amitav.donor@example.com" value="{{ email or '' }}"
+                       placeholder="Enter your registered email address" value="{{ email or '' }}"
                        autocomplete="off" required>
               </div>
             </div>
@@ -417,25 +417,8 @@
               <span>Sign In to HemoNexus</span>
               <i class="fa-solid fa-arrow-right"></i>
             </button>
-
-            <!-- Verified Demo Accounts Quick Reference -->
-            <div class="p-2 rounded bg-light border text-start" style="font-size: 0.76rem; color: #495057;">
-              <div class="fw-bold mb-1 text-ink"><i class="fa-solid fa-database text-primary me-1"></i> Connected SQLite Database Accounts:</div>
-              <div class="d-flex justify-content-between mb-1">
-                <span><strong>Donor:</strong> <code>amitav.donor@example.com</code></span>
-                <span>Pass: <code>Donor@1234</code></span>
-              </div>
-              <div class="d-flex justify-content-between mb-1">
-                <span><strong>Patient:</strong> <code>patient.raj@example.com</code></span>
-                <span>Pass: <code>Patient@1234</code></span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span><strong>Admin:</strong> <code>admin@hemonexus.org</code></span>
-                <span>Pass: <code>Admin@123456</code></span>
-              </div>
-            </div>
-
           </form>
+
 
         </div>
 
@@ -485,7 +468,7 @@
               <label class="form-label small fw-semibold">Registered Email Address *</label>
               <div class="input-group">
                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-regular fa-envelope"></i></span>
-                <input type="email" class="form-control border-start-0 ps-0" id="forgotEmail" placeholder="e.g. patient.raj@example.com" required>
+                <input type="email" class="form-control border-start-0 ps-0" id="forgotEmail" placeholder="Enter your registered email address" required>
               </div>
             </div>
             <div class="d-flex justify-content-end gap-2 pt-2">

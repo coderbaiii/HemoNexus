@@ -8,6 +8,10 @@ load_dotenv(BASE_DIR / ".env")
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "hemonexus-smart-blood-donor-secret-key-2026")
     DATABASE_PATH = os.environ.get("DATABASE_PATH", str(BASE_DIR / "hemonexus.db"))
+
+    # Administrator Initial Credentials (Configurable via Environment Variables)
+    ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@hemonexus.org")
+    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@123456")
     
     # Six-Month Verification Settings
     # ── DEMO MODE: interval = 2 minutes, grace = 1 minute ──────────────────────
