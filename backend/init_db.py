@@ -359,7 +359,7 @@ def seed_data(conn):
             "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
             (admin_pass, now_iso, existing_admin[0])
         )
-
+    conn.commit()  # Ensure admin insert/update is always persisted
 
     # 2. Synthetic Patients
     demo_patients = [
