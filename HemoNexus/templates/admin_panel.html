@@ -219,13 +219,13 @@ const AdminPanel = (() => {
     } catch(e) {}
   };
 
-  const setPreset = (intervalSec, graceSec) => {
+  const setPreset = async (intervalSec, graceSec) => {
     document.getElementById('intervalUnit').value = '1';
     document.getElementById('intervalValue').value = intervalSec;
     document.getElementById('graceUnit').value = '1';
     document.getElementById('graceValue').value = graceSec;
     updateHints();
-    HemoUI.showToast('Preset Loaded', `Interval: ${fmtSeconds(intervalSec)}, Grace: ${fmtSeconds(graceSec)}`, 'info');
+    await saveSettings();
   };
 
   const saveSettings = async () => {

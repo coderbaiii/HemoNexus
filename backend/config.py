@@ -13,12 +13,10 @@ class Config:
     ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@hemonexus.org")
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@123456")
     
-    # Six-Month Verification Settings
-    # ── DEMO MODE: interval = 2 minutes, grace = 1 minute ──────────────────────
-    # To restore production values: change 0.00139 → 180 and 0.000694 → 30
-    VERIFICATION_INTERVAL_DAYS = float(os.environ.get("VERIFICATION_INTERVAL_DAYS", "0.00139"))  # ~2 minutes for demo
-    GRACE_PERIOD_DAYS = float(os.environ.get("GRACE_PERIOD_DAYS", "0.000694"))                   # ~1 minute grace for demo
-    # ── END DEMO MODE ───────────────────────────────────────────────────────────
+    # Six-Month Verification Settings (Default: 180 days interval, 30 days grace)
+    # Can be dynamically adjusted in runtime via Admin Control Panel
+    VERIFICATION_INTERVAL_DAYS = float(os.environ.get("VERIFICATION_INTERVAL_DAYS", "180.0"))
+    GRACE_PERIOD_DAYS = float(os.environ.get("GRACE_PERIOD_DAYS", "30.0"))
     
     # Donation Cooldown Settings (Operational Search Prioritization)
     # Default 56 days for whole blood donation spacing in this prototype.
