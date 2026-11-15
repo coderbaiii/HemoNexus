@@ -257,6 +257,11 @@ def get_request_details(request_id):
     req_row = query_db("SELECT * FROM blood_requests WHERE id = ?", (request_id,), one=True, db=conn)
     if not req_row:
         return jsonify({"success": False, "error": "Blood request not found."}), 404
+
+    user_id = session.get("user_id")
+    user_role = session.get("role")
+    if user_role not in ("admin", "donor") and req_row["patient_id"] != user_id:
+        return jsonify({"success": False, "error": "Access forbidden: You cannot view another patient's private request."}), 403
         
     responses = query_db(
         """SELECT r.id, r.donor_id, r.blood_request_id, r.status, r.response_time, r.message, r.created_at,

@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE COLLATE NOCASE,
     phone TEXT,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('donor', 'patient', 'admin', 'DONOR', 'PATIENT', 'ADMIN')),
+    role TEXT NOT NULL CHECK(role IN ('donor', 'patient', 'admin', 'ngo', 'DONOR', 'PATIENT', 'ADMIN', 'NGO')),
+    profile_photo TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS blood_requests (
     sort_preference TEXT NOT NULL DEFAULT 'DISTANCE' CHECK(sort_preference IN ('DISTANCE', 'VERIFICATION_SCORE', 'COMBINED')),
     request_status TEXT NOT NULL DEFAULT 'OPEN' CHECK(request_status IN ('OPEN', 'MATCHING', 'FULFILLED', 'CANCELLED')),
     status TEXT GENERATED ALWAYS AS (request_status) VIRTUAL,
+    family_member_id INTEGER REFERENCES family_members(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -180,6 +182,74 @@ CREATE TABLE IF NOT EXISTS hospitals (
     name TEXT NOT NULL UNIQUE COLLATE NOCASE,
     city TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================================
+-- 10. FAMILY MEMBERS TABLE
+-- Stores linked family members and blood group records for registered users.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS family_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    relationship TEXT NOT NULL CHECK(relationship IN ('Father', 'Mother', 'Brother', 'Sister', 'Spouse', 'Child', 'Other')),
+    blood_group TEXT NOT NULL CHECK(blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    age INTEGER NOT NULL CHECK(age >= 0 AND age <= 130),
+    phone TEXT,
+    medical_notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================================
+-- 11. NGO PROFILES TABLE
+-- Dedicated registry of authorized blood donation non-governmental organizations.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ngo_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    ngo_name TEXT NOT NULL,
+    registration_number TEXT,
+    contact_person TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    address TEXT NOT NULL,
+    operating_locations TEXT NOT NULL,
+    service_areas TEXT,
+    verification_status TEXT NOT NULL DEFAULT 'PENDING' CHECK(verification_status IN ('PENDING', 'VERIFIED', 'REJECTED')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================================
+-- 12. NGO CONTACT REQUESTS TABLE
+-- Records outreach and blood donation camp invitations between NGOs and donors.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ngo_contact_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ngo_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    donor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blood_group TEXT NOT NULL CHECK(blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    units_needed INTEGER NOT NULL DEFAULT 1 CHECK(units_needed > 0),
+    reason TEXT NOT NULL,
+    message TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'COMPLETED')),
+    donor_consent INTEGER NOT NULL DEFAULT 0 CHECK(donor_consent IN (0, 1)),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ============================================================================
+-- 13. BLOCKED USERS TABLE
+-- User privacy, boundary enforcement, and contact safety controls.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS blocked_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(blocker_id, blocked_id)
 );
 
 -- ============================================================================
@@ -300,6 +370,13 @@ CREATE INDEX IF NOT EXISTS idx_donor_verifications_donor ON donor_verifications(
 CREATE INDEX IF NOT EXISTS idx_request_responses_req_donor ON donor_request_responses(blood_request_id, donor_id);
 CREATE INDEX IF NOT EXISTS idx_donation_records_donor ON donation_records(donor_id, donation_date);
 CREATE INDEX IF NOT EXISTS idx_donation_records_request ON donation_records(request_id);
+CREATE INDEX IF NOT EXISTS idx_family_members_user ON family_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_ngo_profiles_user ON ngo_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_ngo_verification ON ngo_profiles(verification_status);
+CREATE INDEX IF NOT EXISTS idx_ngo_requests_ngo ON ngo_contact_requests(ngo_id);
+CREATE INDEX IF NOT EXISTS idx_ngo_requests_donor ON ngo_contact_requests(donor_id);
+CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users(blocked_id);
 """
 
 def sync_admin_credentials(conn):
