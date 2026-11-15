@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS users (
     phone TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('donor', 'patient', 'admin', 'ngo', 'DONOR', 'PATIENT', 'ADMIN', 'NGO')),
-    profile_photo TEXT,
+    account_status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(account_status IN ('ACTIVE', 'BLOCKED', 'SUSPENDED')),
+    profile_photo TEXT DEFAULT NULL,
+    address TEXT DEFAULT NULL,
+    city TEXT DEFAULT 'Kolkata',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -58,6 +61,10 @@ CREATE TABLE IF NOT EXISTS donor_profiles (
     status TEXT GENERATED ALWAYS AS (profile_status) VIRTUAL,
     last_verified_date TEXT NOT NULL DEFAULT (datetime('now')),
     next_verification_date TEXT NOT NULL,
+    kyc_status TEXT NOT NULL DEFAULT 'VERIFIED' CHECK(kyc_status IN ('PENDING', 'VERIFIED', 'EXPIRED')),
+    kyc_updated_at TEXT DEFAULT (datetime('now')),
+    total_donations INTEGER NOT NULL DEFAULT 0 CHECK(total_donations >= 0),
+    privacy_preference TEXT NOT NULL DEFAULT 'MASKED' CHECK(privacy_preference IN ('MASKED', 'ALWAYS_VISIBLE', 'CONSENT_ONLY')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -102,7 +109,6 @@ CREATE TABLE IF NOT EXISTS blood_requests (
     sort_preference TEXT NOT NULL DEFAULT 'DISTANCE' CHECK(sort_preference IN ('DISTANCE', 'VERIFICATION_SCORE', 'COMBINED')),
     request_status TEXT NOT NULL DEFAULT 'OPEN' CHECK(request_status IN ('OPEN', 'MATCHING', 'FULFILLED', 'CANCELLED')),
     status TEXT GENERATED ALWAYS AS (request_status) VIRTUAL,
-    family_member_id INTEGER REFERENCES family_members(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -186,7 +192,7 @@ CREATE TABLE IF NOT EXISTS hospitals (
 
 -- ============================================================================
 -- 10. FAMILY MEMBERS TABLE
--- Stores linked family members and blood group records for registered users.
+-- Personal family member blood group registry for rapid emergency dispatch.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS family_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -194,8 +200,8 @@ CREATE TABLE IF NOT EXISTS family_members (
     full_name TEXT NOT NULL,
     relationship TEXT NOT NULL CHECK(relationship IN ('Father', 'Mother', 'Brother', 'Sister', 'Spouse', 'Child', 'Other')),
     blood_group TEXT NOT NULL CHECK(blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
-    age INTEGER NOT NULL CHECK(age >= 0 AND age <= 130),
-    phone TEXT,
+    age INTEGER CHECK(age > 0 AND age < 130),
+    contact_number TEXT,
     medical_notes TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -203,45 +209,71 @@ CREATE TABLE IF NOT EXISTS family_members (
 
 -- ============================================================================
 -- 11. NGO PROFILES TABLE
--- Dedicated registry of authorized blood donation non-governmental organizations.
+-- Dedicated profile and verified credentials for registered Blood Donation NGOs.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS ngo_profiles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     ngo_name TEXT NOT NULL,
-    registration_number TEXT,
+    registration_number TEXT NOT NULL UNIQUE,
     contact_person TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    email TEXT NOT NULL,
-    address TEXT NOT NULL,
-    operating_locations TEXT NOT NULL,
-    service_areas TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    city TEXT DEFAULT 'Kolkata',
+    service_areas TEXT DEFAULT 'Kolkata Metropolitan Area',
     verification_status TEXT NOT NULL DEFAULT 'PENDING' CHECK(verification_status IN ('PENDING', 'VERIFIED', 'REJECTED')),
+    govt_license_number TEXT DEFAULT NULL,
+    govt_verified INTEGER NOT NULL DEFAULT 0 CHECK(govt_verified IN (0, 1)),
+    fraud_status TEXT NOT NULL DEFAULT 'CLEAN' CHECK(fraud_status IN ('CLEAN', 'FLAGGED', 'BLOCKED')),
+    fraud_reason TEXT DEFAULT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- ============================================================================
 -- 12. NGO CONTACT REQUESTS TABLE
--- Records outreach and blood donation camp invitations between NGOs and donors.
+-- Contact outreach and consent management between NGOs and donors.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS ngo_contact_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ngo_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     donor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    blood_group TEXT NOT NULL CHECK(blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
-    units_needed INTEGER NOT NULL DEFAULT 1 CHECK(units_needed > 0),
-    reason TEXT NOT NULL,
+    required_blood_group TEXT NOT NULL CHECK(required_blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
     message TEXT,
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'COMPLETED')),
-    donor_consent INTEGER NOT NULL DEFAULT 0 CHECK(donor_consent IN (0, 1)),
+    response_time TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(ngo_id, donor_id, required_blood_group)
+);
+
+-- ============================================================================
+-- 13. PATIENT TO NGO BLOOD REQUESTS TABLE
+-- Allows patients to search and request blood units directly from accredited NGOs.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS patient_ngo_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ngo_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    patient_name TEXT NOT NULL,
+    patient_phone TEXT,
+    blood_group TEXT NOT NULL CHECK(blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    units_required INTEGER NOT NULL DEFAULT 1 CHECK(units_required > 0),
+    hospital_name TEXT NOT NULL,
+    hospital_location TEXT,
+    urgency TEXT NOT NULL DEFAULT 'URGENT' CHECK(urgency IN ('NORMAL', 'URGENT', 'CRITICAL')),
+    patient_notes TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'FULFILLED')),
+    ngo_response_message TEXT,
+    responded_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- ============================================================================
 -- 13. BLOCKED USERS TABLE
--- User privacy, boundary enforcement, and contact safety controls.
+-- Account-level blocking for user safety, harassment protection, and contact restriction.
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS blocked_users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,7 +281,8 @@ CREATE TABLE IF NOT EXISTS blocked_users (
     blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reason TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(blocker_id, blocked_id)
+    UNIQUE(blocker_id, blocked_id),
+    CHECK(blocker_id != blocked_id)
 );
 
 -- ============================================================================
@@ -370,13 +403,6 @@ CREATE INDEX IF NOT EXISTS idx_donor_verifications_donor ON donor_verifications(
 CREATE INDEX IF NOT EXISTS idx_request_responses_req_donor ON donor_request_responses(blood_request_id, donor_id);
 CREATE INDEX IF NOT EXISTS idx_donation_records_donor ON donation_records(donor_id, donation_date);
 CREATE INDEX IF NOT EXISTS idx_donation_records_request ON donation_records(request_id);
-CREATE INDEX IF NOT EXISTS idx_family_members_user ON family_members(user_id);
-CREATE INDEX IF NOT EXISTS idx_ngo_profiles_user ON ngo_profiles(user_id);
-CREATE INDEX IF NOT EXISTS idx_ngo_verification ON ngo_profiles(verification_status);
-CREATE INDEX IF NOT EXISTS idx_ngo_requests_ngo ON ngo_contact_requests(ngo_id);
-CREATE INDEX IF NOT EXISTS idx_ngo_requests_donor ON ngo_contact_requests(donor_id);
-CREATE INDEX IF NOT EXISTS idx_blocked_users_blocker ON blocked_users(blocker_id);
-CREATE INDEX IF NOT EXISTS idx_blocked_users_blocked ON blocked_users(blocked_id);
 """
 
 def sync_admin_credentials(conn):
@@ -419,15 +445,8 @@ def init_database(db_path=None, seed_demo=True):
     sync_admin_credentials(conn)
 
     cur.close()
-    try:
-        from flask import has_app_context, g
-        if has_app_context() and "_database" in g and g._database == conn:
-            pass
-        elif db_path:
-            conn.close()
-    except Exception:
-        if db_path:
-            conn.close()
+    if db_path:
+        conn.close()
     print("Database schema initialized successfully.")
 
 def seed_data(conn):
@@ -532,18 +551,25 @@ def seed_data(conn):
                 (pid, p["phone"], p["loc"], p["lat"], p["lon"], now_iso, now_iso)
             )
             patient_ids[p["email"]] = pid
+            if "req_blood" in p:
+                cur.execute(
+                    """INSERT INTO blood_requests
+                       (patient_id, required_blood_group, required_units, hospital_name, location, latitude, longitude, urgency, preferred_max_distance, request_status, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)""",
+                    (pid, p["req_blood"], p["units"], p["hospital"], p["loc"], p["lat"], p["lon"], p["urgency"], p["max_dist"], now_iso, now_iso)
+                )
         else:
             pid = p_row[0]
             patient_ids[p["email"]] = pid
-
-        # Seed initial blood request for demo patient
-        cur.execute("SELECT id FROM blood_requests WHERE patient_id = ?", (pid,))
-        if not cur.fetchone():
-            cur.execute("""
-                INSERT INTO blood_requests 
-                (patient_id, required_blood_group, required_units, hospital_name, location, latitude, longitude, preferred_max_distance, required_date_time, urgency, request_status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
-            """, (pid, p["req_blood"], p["units"], p["hospital"], p["loc"], p["lat"], p["lon"], p["max_dist"], now_iso, p["urgency"], now_iso, now_iso))
+            if "req_blood" in p:
+                cur.execute("SELECT id FROM blood_requests WHERE patient_id = ?", (pid,))
+                if not cur.fetchone():
+                    cur.execute(
+                        """INSERT INTO blood_requests
+                           (patient_id, required_blood_group, required_units, hospital_name, location, latitude, longitude, urgency, preferred_max_distance, request_status, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)""",
+                        (pid, p["req_blood"], p["units"], p["hospital"], p["loc"], p["lat"], p["lon"], p["urgency"], p["max_dist"], now_iso, now_iso)
+                    )
 
 
     # 3. Comprehensive Synthetic Donors across all blood groups & verification states
@@ -769,6 +795,75 @@ def seed_data(conn):
         FROM blood_requests
         WHERE hospital_name IS NOT NULL AND TRIM(hospital_name) != ''
     """)
+
+    # 6. Seed Pre-Registered Demo NGOs
+    demo_ngos = [
+        {
+            "name": "Indian Red Cross Blood Care Society",
+            "email": "ngo.redcross@example.com",
+            "password": "Password123",
+            "reg_no": "WB-NGO-RED-1042",
+            "contact_person": "Dr. Anirban Roy",
+            "phone": "+91 98301 22334",
+            "address": "5/1 Chowringhee Square, Central Kolkata",
+            "city": "Kolkata",
+            "service_areas": "Central Kolkata, Salt Lake, New Town, Park Street",
+            "status": "VERIFIED"
+        },
+        {
+            "name": "Lions Blood Lifeline Foundation",
+            "email": "ngo.lions@example.com",
+            "password": "Password123",
+            "reg_no": "WB-NGO-LIO-2089",
+            "contact_person": "Priyanka Banerjee",
+            "phone": "+91 98311 44556",
+            "address": "12 Deshapriya Park Road, Ballygunge",
+            "city": "Kolkata",
+            "service_areas": "South Kolkata, Jadavpur, Behala, Tollygunge",
+            "status": "VERIFIED"
+        },
+        {
+            "name": "Rotary Jeevandeep Blood Initiative",
+            "email": "ngo.rotary@example.com",
+            "password": "Password123",
+            "reg_no": "WB-NGO-ROT-3310",
+            "contact_person": "Vikramaditya Bose",
+            "phone": "+91 98322 66778",
+            "address": "44 Grand Trunk Road, Howrah",
+            "city": "Howrah",
+            "service_areas": "Howrah Municipal Area, Shibpur, Bally, Salkia",
+            "status": "VERIFIED"
+        },
+        {
+            "name": "Hope Youth Blood Donors Network",
+            "email": "ngo.hope@example.com",
+            "password": "Password123",
+            "reg_no": "WB-NGO-HPY-4451",
+            "contact_person": "Debolina Dutta",
+            "phone": "+91 98333 88990",
+            "address": "78 Jessore Road, Dum Dum",
+            "city": "Kolkata",
+            "service_areas": "North Kolkata, Dum Dum, Barasat, Belgharia",
+            "status": "PENDING"
+        }
+    ]
+
+    for ngo in demo_ngos:
+        cur.execute("SELECT id FROM users WHERE email = ?", (ngo["email"],))
+        if not cur.fetchone():
+            hashed_pw = generate_password_hash(ngo["password"])
+            cur.execute(
+                """INSERT INTO users (full_name, email, phone, password_hash, role, address, city, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 'ngo', ?, ?, ?, ?)""",
+                (ngo["name"], ngo["email"], ngo["phone"], hashed_pw, ngo["address"], ngo["city"], now_iso, now_iso)
+            )
+            u_id = cur.lastrowid
+            cur.execute(
+                """INSERT INTO ngo_profiles 
+                   (user_id, ngo_name, registration_number, contact_person, phone, email, address, city, service_areas, verification_status, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (u_id, ngo["name"], ngo["reg_no"], ngo["contact_person"], ngo["phone"], ngo["email"], ngo["address"], ngo["city"], ngo["service_areas"], ngo["status"], now_iso, now_iso)
+            )
 
     conn.commit()
 

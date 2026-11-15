@@ -263,6 +263,11 @@ def get_request_details(request_id):
     if user_role not in ("admin", "donor") and req_row["patient_id"] != user_id:
         return jsonify({"success": False, "error": "Access forbidden: You cannot view another patient's private request."}), 403
         
+    user_id = session.get("user_id")
+    user_role = session.get("role")
+    if user_role != "admin" and req_row["patient_id"] != user_id:
+        return jsonify({"success": False, "error": "Access forbidden: you do not own this blood request."}), 403
+        
     responses = query_db(
         """SELECT r.id, r.donor_id, r.blood_request_id, r.status, r.response_time, r.message, r.created_at,
                   u.full_name AS donor_name, u.email AS donor_email,
@@ -338,6 +343,17 @@ def send_donor_request(request_id):
         else:
             return jsonify({"success": False, "error": "Specified donor was not found."}), 404
             
+    # Check if blocked
+    is_blocked = query_db(
+        """SELECT id FROM blocked_users 
+           WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)""",
+        (user_id, donor_user_id, donor_user_id, user_id),
+        one=True,
+        db=conn
+    )
+    if is_blocked:
+        return jsonify({"success": False, "error": "Cannot dispatch request to this donor due to account privacy/blocking settings."}), 403
+
     # Check for duplicate request
     existing = query_db(
         "SELECT id, status FROM donor_request_responses WHERE blood_request_id = ? AND donor_id = ?",
@@ -441,3 +457,122 @@ def fulfill_blood_request(request_id):
     execute_db("UPDATE blood_requests SET request_status = 'FULFILLED', updated_at = ? WHERE id = ?", (now, request_id), db=conn)
     
     return jsonify({"success": True, "message": "Blood request marked as fulfilled."}), 200
+
+@patient_bp.route("/api/patient/ngos", methods=["GET"])
+@login_required
+def list_ngos_for_patient():
+    """
+    List accredited NGOs and blood centers for patients.
+    Supports filtering by city or blood group requirement.
+    """
+    conn = get_db()
+    city = (request.args.get("city") or "").strip()
+    blood_group = (request.args.get("blood_group") or "").strip().upper()
+    
+    sql = """
+        SELECT np.*, u.full_name AS coordinator_name, u.phone AS contact_phone, u.email AS contact_email
+        FROM ngo_profiles np
+        JOIN users u ON np.user_id = u.id
+        WHERE np.verification_status = 'VERIFIED' AND u.account_status != 'BLOCKED'
+    """
+    params = []
+    if city:
+        sql += " AND (np.city LIKE ? OR np.service_areas LIKE ?)"
+        params.extend([f"%{city}%", f"%{city}%"])
+        
+    sql += " ORDER BY np.govt_verified DESC, np.created_at ASC"
+    ngos = query_db(sql, tuple(params), db=conn) or []
+    
+    sanitized = []
+    for ngo in ngos:
+        sanitized.append({
+            "ngo_id": ngo["user_id"],
+            "profile_id": ngo["id"],
+            "ngo_name": ngo["ngo_name"],
+            "registration_number": ngo["registration_number"],
+            "contact_person": ngo["contact_person"] or ngo["coordinator_name"],
+            "phone": ngo["phone"] or ngo["contact_phone"] or "+91 33 2222 0000",
+            "email": ngo["email"] or ngo["contact_email"],
+            "city": ngo["city"],
+            "address": ngo["address"] or "Central Kolkata",
+            "service_areas": ngo["service_areas"],
+            "govt_verified": bool(ngo["govt_verified"]),
+            "verification_status": ngo["verification_status"],
+            "portal_url": f"/ngo/{ngo['user_id']}"
+        })
+        
+    return jsonify({"success": True, "ngos": sanitized, "total_ngos": len(sanitized)}), 200
+
+@patient_bp.route("/api/patient/ngo-requests", methods=["POST"])
+@role_required("patient", "admin")
+def create_patient_ngo_request():
+    """Patient submits a direct blood requisition to an accredited NGO."""
+    patient_user_id = session["user_id"]
+    data = request.get_json(silent=True) or request.form.to_dict()
+    conn = get_db()
+    
+    ngo_id = data.get("ngo_id")
+    blood_group = (data.get("blood_group") or "O+").strip().upper()
+    units = int(data.get("units_required") or data.get("units") or 1)
+    hospital_name = (data.get("hospital_name") or "Medical College Hospital, Kolkata").strip()
+    hospital_loc = (data.get("hospital_location") or "Kolkata").strip()
+    urgency = (data.get("urgency") or "URGENT").strip().upper()
+    notes = (data.get("notes") or "Patient requisition submitted via HemoNexus Clinical Portal.").strip()
+    
+    if not ngo_id:
+        return jsonify({"success": False, "error": "Target NGO ID is required."}), 400
+        
+    # Check that target NGO exists and is active
+    ngo = query_db("SELECT np.*, u.full_name FROM ngo_profiles np JOIN users u ON np.user_id = u.id WHERE np.user_id = ? OR np.id = ?", (ngo_id, ngo_id), one=True, db=conn)
+    if not ngo:
+        return jsonify({"success": False, "error": "Target NGO was not found or is inactive."}), 404
+        
+    actual_ngo_id = ngo["user_id"]
+    
+    # Check patient name & contact
+    patient_user = query_db("SELECT full_name, phone FROM users WHERE id = ?", (patient_user_id,), one=True, db=conn)
+    patient_name = (data.get("patient_name") or patient_user["full_name"]).strip()
+    patient_phone = (data.get("patient_phone") or patient_user["phone"] or "").strip()
+    
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    req_id, _ = execute_db(
+        """INSERT INTO patient_ngo_requests
+           (patient_id, ngo_id, patient_name, patient_phone, blood_group, units_required, hospital_name, hospital_location, urgency, patient_notes, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)""",
+        (patient_user_id, actual_ngo_id, patient_name, patient_phone, blood_group, units, hospital_name, hospital_loc, urgency, notes, now, now),
+        db=conn
+    )
+    
+    # Audit log
+    execute_db(
+        "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
+        (patient_user_id, "PATIENT_NGO_REQUEST_SENT", f"Patient requested {units} units of {blood_group} from {ngo['ngo_name']}"),
+        db=conn
+    )
+    
+    return jsonify({
+        "success": True,
+        "message": f"Blood requirement sent to {ngo['ngo_name']}. The organization will review their blood bank stock/donor pool and dispatch a response.",
+        "request_id": req_id,
+        "status": "PENDING"
+    }), 201
+
+@patient_bp.route("/api/patient/my-ngo-requests", methods=["GET"])
+@role_required("patient", "admin")
+def get_patient_ngo_requests():
+    """List blood requests submitted by this patient to NGOs."""
+    patient_user_id = session["user_id"]
+    conn = get_db()
+    
+    requests = query_db(
+        """SELECT pnr.*, np.ngo_name, np.contact_person AS ngo_contact_person,
+                  np.phone AS ngo_phone, np.email AS ngo_email, np.city AS ngo_city
+           FROM patient_ngo_requests pnr
+           JOIN ngo_profiles np ON pnr.ngo_id = np.user_id
+           WHERE pnr.patient_id = ?
+           ORDER BY pnr.created_at DESC""",
+        (patient_user_id,),
+        db=conn
+    ) or []
+    
+    return jsonify({"success": True, "requests": requests}), 200

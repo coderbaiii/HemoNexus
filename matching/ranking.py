@@ -139,10 +139,37 @@ def rank_recently_verified(candidates):
         d["rank"] = idx
     return ranked
 
-def rank_best_match(candidates, patient_max_dist=25.0, urgency="NORMAL", weights=None, now_dt=None):
+def rank_by_donation_history(candidates):
+    """Ranks candidates by total_donations count descending."""
+    ranked = sorted(candidates, key=lambda d: d.get("total_donations", 0), reverse=True)
+    for idx, d in enumerate(ranked, start=1):
+        d["rank"] = idx
+    return ranked
+
+def rank_by_response_reliability(candidates):
+    """Ranks candidates by response reliability percentage descending."""
+    ranked = sorted(candidates, key=lambda d: d.get("response_reliability", 0.0), reverse=True)
+    for idx, d in enumerate(ranked, start=1):
+        d["rank"] = idx
+    return ranked
+
+def rank_by_compatibility(candidates, req_blood_group=None):
+    """Ranks candidates by blood compatibility: exact match first, then compatible matches."""
+    def comp_key(d):
+        d_grp = (d.get("blood_group") or "").strip().upper()
+        r_grp = (req_blood_group or "").strip().upper()
+        if r_grp and d_grp == r_grp:
+            return 2
+        return 1
+    ranked = sorted(candidates, key=comp_key, reverse=True)
+    for idx, d in enumerate(ranked, start=1):
+        d["rank"] = idx
+    return ranked
+
+def rank_best_match(candidates, patient_max_dist=25.0, urgency="NORMAL", weights=None, now_dt=None, req_blood_group=None):
     """
     Ranks candidates by composite matching_score descending.
-    Attaches score breakdown to every candidate record.
+    Attaches score breakdown and transparent recommendation reasons to every candidate record.
     """
     for d in candidates:
         score, breakdown = calculate_matching_score(
@@ -154,16 +181,48 @@ def rank_best_match(candidates, patient_max_dist=25.0, urgency="NORMAL", weights
         )
         d["matching_score"] = score
         d["score_breakdown"] = breakdown
+        
+        # Build transparent recommendation explanation
+        reasons = []
+        d_group = (d.get("blood_group") or "").strip().upper()
+        r_group = (req_blood_group or d.get("required_blood_group") or "").strip().upper()
+        if r_group:
+            if d_group == r_group:
+                reasons.append(f"Exact Blood Group Match ({d_group})")
+            else:
+                reasons.append(f"Medically Compatible Donor ({d_group} for {r_group})")
+        else:
+            reasons.append(f"Verified Blood Group {d_group}")
+            
+        dist = d.get("distance_km")
+        if dist is not None:
+            reasons.append(f"Proximity: ~{round(dist, 1)} km ({d.get('estimated_travel_time', 15)} min ETA)")
+            
+        if d.get("availability") == "24_HOURS":
+            reasons.append("24-Hour Emergency Availability")
+        elif d.get("availability"):
+            reasons.append(f"Available ({d.get('availability')})")
+            
+        tot_donations = d.get("total_donations", 0)
+        if tot_donations > 0:
+            reasons.append(f"Experienced Donor ({tot_donations} donations)")
+            
+        rel = d.get("response_reliability")
+        if rel and rel >= 80:
+            reasons.append(f"High Reliability ({round(rel, 1)}% acceptance rate)")
+            
+        reasons.append("Active 6-Month Medical Safety Profile")
+        d["recommendation_reasons"] = reasons
 
     ranked = sorted(candidates, key=lambda d: d.get("matching_score", 0.0), reverse=True)
     for idx, d in enumerate(ranked, start=1):
         d["rank"] = idx
     return ranked
 
-def apply_ranking(candidates, sorting_preference="BEST_MATCH", patient_max_dist=25.0, urgency="NORMAL", average_speed_kmh=30.0):
+def apply_ranking(candidates, sorting_preference="BEST_MATCH", patient_max_dist=25.0, urgency="NORMAL", average_speed_kmh=30.0, req_blood_group=None):
     """
     Applies the chosen ranking mechanism to pre-filtered valid candidates.
-    Also ensures estimated_travel_time and matching_score are computed for transparency.
+    Also ensures estimated_travel_time, matching_score, and transparent explanations are computed.
     """
     if not candidates:
         return []
@@ -175,28 +234,36 @@ def apply_ranking(candidates, sorting_preference="BEST_MATCH", patient_max_dist=
         
     pref = (sorting_preference or "BEST_MATCH").strip().upper().replace(" ", "_")
 
-    if pref in ("NEAREST", "DISTANCE"):
-        # Still compute matching_score for display badge
-        for d in candidates:
-            score, breakdown = calculate_matching_score(d, patient_max_dist=patient_max_dist, urgency=urgency)
-            d["matching_score"] = score
-            d["score_breakdown"] = breakdown
+    # Always ensure matching_score & recommendation_reasons are computed for display badges
+    for d in candidates:
+        score, breakdown = calculate_matching_score(d, patient_max_dist=patient_max_dist, urgency=urgency)
+        d["matching_score"] = score
+        d["score_breakdown"] = breakdown
+        if not d.get("recommendation_reasons"):
+            d["recommendation_reasons"] = [
+                f"Blood Group {d.get('blood_group')}",
+                f"Proximity: ~{round(d.get('distance_km', 3.0), 1) if d.get('distance_km') is not None else 'Nearby'} km",
+                "Active Verification Status"
+            ]
+
+    if pref in ("NEAREST", "DISTANCE", "NEAREST_DONOR"):
         return rank_nearest(candidates)
 
     elif pref in ("FASTEST", "TRAVEL_TIME"):
-        for d in candidates:
-            score, breakdown = calculate_matching_score(d, patient_max_dist=patient_max_dist, urgency=urgency)
-            d["matching_score"] = score
-            d["score_breakdown"] = breakdown
         return rank_fastest(candidates, speed)
 
-    elif pref in ("RECENTLY_VERIFIED", "VERIFIED", "FRESH"):
-        for d in candidates:
-            score, breakdown = calculate_matching_score(d, patient_max_dist=patient_max_dist, urgency=urgency)
-            d["matching_score"] = score
-            d["score_breakdown"] = breakdown
+    elif pref in ("RECENTLY_VERIFIED", "VERIFIED", "FRESH", "RECENTLY_AVAILABLE"):
         return rank_recently_verified(candidates)
+
+    elif pref in ("DONATION_HISTORY", "HISTORY", "DONATIONS"):
+        return rank_by_donation_history(candidates)
+
+    elif pref in ("RESPONSE_RELIABILITY", "RELIABILITY"):
+        return rank_by_response_reliability(candidates)
+
+    elif pref in ("COMPATIBILITY", "BLOOD_COMPATIBILITY"):
+        return rank_by_compatibility(candidates, req_blood_group)
 
     else:
         # Default: BEST_MATCH
-        return rank_best_match(candidates, patient_max_dist=patient_max_dist, urgency=urgency)
+        return rank_best_match(candidates, patient_max_dist=patient_max_dist, urgency=urgency, req_blood_group=req_blood_group)

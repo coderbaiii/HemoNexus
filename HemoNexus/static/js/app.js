@@ -8,18 +8,24 @@
 // Authentication & Role Toggle Controller (Requirement 1 & 5)
 const HemoAuth = (() => {
   const switchRole = (role) => {
-    const isDonor = role === 'donor';
     const roleInput = document.getElementById('authRoleInput');
     if (roleInput) roleInput.value = role;
 
     // Toggle pill buttons
     const donorBtn = document.getElementById('toggleDonorBtn');
     const patientBtn = document.getElementById('togglePatientBtn');
-    if (donorBtn && patientBtn) {
-      donorBtn.classList.toggle('active', isDonor);
-      donorBtn.setAttribute('aria-selected', isDonor ? 'true' : 'false');
-      patientBtn.classList.toggle('active', !isDonor);
-      patientBtn.setAttribute('aria-selected', !isDonor ? 'true' : 'false');
+    const ngoBtn = document.getElementById('toggleNgoBtn');
+    if (donorBtn) {
+      donorBtn.classList.toggle('active', role === 'donor');
+      donorBtn.setAttribute('aria-selected', role === 'donor' ? 'true' : 'false');
+    }
+    if (patientBtn) {
+      patientBtn.classList.toggle('active', role === 'patient');
+      patientBtn.setAttribute('aria-selected', role === 'patient' ? 'true' : 'false');
+    }
+    if (ngoBtn) {
+      ngoBtn.classList.toggle('active', role === 'ngo');
+      ngoBtn.setAttribute('aria-selected', role === 'ngo' ? 'true' : 'false');
     }
 
     // Update Headings & Messages
@@ -29,8 +35,13 @@ const HemoAuth = (() => {
     const regLink = document.getElementById('registerRoleLink');
     const donorFields = document.getElementById('donorFieldSub');
     const patientFields = document.getElementById('patientFieldSub');
+    const ngoFields = document.getElementById('ngoFieldSub');
 
-    if (isDonor) {
+    if (donorFields) donorFields.classList.toggle('d-none', role !== 'donor');
+    if (patientFields) patientFields.classList.toggle('d-none', role !== 'patient');
+    if (ngoFields) ngoFields.classList.toggle('d-none', role !== 'ngo');
+
+    if (role === 'donor') {
       if (titleEl) titleEl.textContent = 'Portal Sign In';
       if (subtitleEl) subtitleEl.textContent = 'Access your HemoNexus clinical network profile';
       if (contextText) {
@@ -42,9 +53,7 @@ const HemoAuth = (() => {
         regLink.href = '/register?role=donor';
         regLink.textContent = 'Register as a Volunteer Donor';
       }
-      if (donorFields) donorFields.classList.remove('d-none');
-      if (patientFields) patientFields.classList.add('d-none');
-    } else {
+    } else if (role === 'patient') {
       if (titleEl) titleEl.textContent = 'Portal Sign In';
       if (subtitleEl) subtitleEl.textContent = 'Access your HemoNexus clinical network profile';
       if (contextText) {
@@ -56,34 +65,56 @@ const HemoAuth = (() => {
         regLink.href = '/register?role=patient';
         regLink.textContent = 'Register as a Patient or Hospital';
       }
-      if (donorFields) donorFields.classList.add('d-none');
-      if (patientFields) patientFields.classList.remove('d-none');
+    } else if (role === 'ngo') {
+      if (titleEl) titleEl.textContent = 'NGO Operations Portal Sign In';
+      if (subtitleEl) subtitleEl.textContent = 'Authorized entry for accredited blood donation NGOs';
+      if (contextText) {
+        contextText.innerHTML = '<strong>Authorized Blood Donation NGO:</strong> Coordinate blood drives, access smart donor recommendations, and track outreach.';
+      }
+      const previewEl = document.getElementById('rolePreviewText');
+      if (previewEl) previewEl.textContent = 'Coordinate community blood drives, search eligible donors, and track outreach.';
+      if (regLink) {
+        regLink.href = '/register?role=ngo';
+        regLink.textContent = 'Register an Authorized NGO / Organization';
+      }
     }
   };
 
   const switchRegRole = (role) => {
-    const isDonor = role === 'donor';
     const regRoleInput = document.getElementById('regRoleInput');
     if (regRoleInput) regRoleInput.value = role;
 
     const donorBtn = document.getElementById('regToggleDonorBtn');
     const patientBtn = document.getElementById('regTogglePatientBtn');
-    if (donorBtn && patientBtn) {
-      donorBtn.classList.toggle('active', isDonor);
-      patientBtn.classList.toggle('active', !isDonor);
-    }
+    const ngoBtn = document.getElementById('regToggleNgoBtn');
+    if (donorBtn) donorBtn.classList.toggle('active', role === 'donor');
+    if (patientBtn) patientBtn.classList.toggle('active', role === 'patient');
+    if (ngoBtn) ngoBtn.classList.toggle('active', role === 'ngo');
 
     const titleEl = document.getElementById('registerHeaderTitle');
     const subtitleEl = document.getElementById('registerHeaderSubtitle');
     if (titleEl && subtitleEl) {
-      if (isDonor) {
+      if (role === 'donor') {
         titleEl.textContent = 'Register as a Volunteer Donor';
         subtitleEl.textContent = 'Join the verified donor directory to respond to urgent blood requirements.';
+      } else if (role === 'ngo') {
+        titleEl.textContent = 'Register as a Blood Donation NGO';
+        subtitleEl.textContent = 'Coordinate community blood drives and access verified donor recommendations.';
       } else {
-        titleEl.textContent = 'Register as a Patient or Hospital';
+        titleEl.textContent = 'Register as a Patient or Seeker';
         subtitleEl.textContent = 'Connect with regional blood banks and initiate rapid emergency dispatches.';
       }
     }
+
+    const ngoFields = document.getElementById('ngoSpecificFields');
+    const bgContainer = document.getElementById('bloodGroupContainer');
+    const ngoRegInput = document.getElementById('ngoRegNumberInput');
+    const bgSelect = document.getElementById('regBloodGroupSelect');
+
+    if (ngoFields) ngoFields.style.display = role === 'ngo' ? 'block' : 'none';
+    if (bgContainer) bgContainer.style.display = role === 'ngo' ? 'none' : 'block';
+    if (ngoRegInput) ngoRegInput.required = role === 'ngo';
+    if (bgSelect) bgSelect.required = role !== 'ngo';
   };
 
   const togglePasswordVisibility = (inputId, triggerBtn) => {

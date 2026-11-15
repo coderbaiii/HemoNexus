@@ -73,7 +73,7 @@
 
     <!-- User Profile Dropdown / Sign In -->
     {% if session.get('user_name') %}
-    <div class="header-user d-flex align-center gap-2 p-1 rounded-lg border bg-white cursor-pointer" onclick="HemoUI.showToast('Signed In Account', 'Active: {{ session.get('user_name') }} ({{ session.get('role', 'user').capitalize() }})', 'info')">
+    <a href="/profile" class="header-user text-decoration-none d-flex align-center gap-2 p-1 rounded-lg border bg-white cursor-pointer" title="Manage Profile & Settings">
       <div class="user-avatar" style="width: 2rem; height: 2rem; font-size: 0.75rem; background: var(--crimson); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
         {{ session.get('user_name')[:2].upper() }}
       </div>
@@ -81,7 +81,7 @@
         <div class="user-name fw-bold text-xs text-ink lh-1" id="headerUserName">{{ session.get('user_name') }}</div>
         <div class="user-role text-muted text-capitalize" id="headerUserRole" style="font-size: 0.65rem;">{{ session.get('role', 'user') }}</div>
       </div>
-    </div>
+    </a>
     <a href="/logout" class="btn btn-outline-danger btn-sm" title="Sign Out">
       <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Sign Out
     </a>

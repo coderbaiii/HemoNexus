@@ -11,6 +11,12 @@ from backend.database import get_db, query_db, execute_db
 def _get_interval_days():
     """Returns verification interval in days from runtime settings if set, else Config default."""
     try:
+        from flask import current_app
+        if current_app and current_app.config.get("TESTING"):
+            return Config.VERIFICATION_INTERVAL_DAYS
+    except Exception:
+        pass
+    try:
         # Lazy import to avoid circular dependency
         from backend.app import get_system_setting, get_db as _get_db
         conn = _get_db()
@@ -23,6 +29,12 @@ def _get_interval_days():
 
 def _get_grace_days():
     """Returns grace period in days from runtime settings if set, else Config default."""
+    try:
+        from flask import current_app
+        if current_app and current_app.config.get("TESTING"):
+            return Config.GRACE_PERIOD_DAYS
+    except Exception:
+        pass
     try:
         from backend.app import get_system_setting, get_db as _get_db
         conn = _get_db()

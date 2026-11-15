@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile Management | HemoNexus{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+  <!-- Page Header -->
+  <div class="page-header d-flex justify-between align-center flex-wrap gap-3 mb-4">
+    <div>
+      <div class="d-flex align-center gap-2">
+        <h1 class="page-title mb-0">My Account &amp; Profile Settings</h1>
+        <span class="badge badge-primary text-uppercase" id="userRoleBadge">{{ session.get('role', 'User') }}</span>
+      </div>
+      <p class="page-subtitle text-muted mt-1">Manage personal contact information, medical parameters, donor availability, and security settings.</p>
+    </div>
+    <div class="page-actions d-flex gap-2">
+      <a href="/blocked-accounts" class="btn btn-outline-danger btn-sm">
+        <i class="fa-solid fa-user-shield me-1"></i> Blocked Accounts Safety
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Column: User Card & Summary -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm text-center p-4">
+        <div class="position-relative d-inline-block mx-auto mb-3">
+          <div id="profilePhotoDisplay" style="width: 6.5rem; height: 6.5rem; border-radius: 50%; background: var(--crimson); color: white; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: bold; border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+            {{ session.get('user_name', 'U')[:2].upper() }}
+          </div>
+        </div>
+
+        <h4 class="fw-bold text-ink mb-1" id="profileCardName">{{ session.get('user_name') }}</h4>
+        <div class="text-xs text-muted mb-3" id="profileCardEmail">{{ session.get('user_email') }}</div>
+
+        <div class="d-flex justify-center gap-2 mb-4">
+          <span class="badge bg-light text-ink border" id="profileCardLocation"><i class="fa-solid fa-location-dot me-1 text-crimson"></i> Kolkata</span>
+          <span class="badge bg-light text-ink border fw-bold text-crimson" id="profileCardBloodGroup">Blood Group: O+</span>
+        </div>
+
+        <div class="border-top pt-3 text-start">
+          <div class="text-xs fw-bold text-muted text-uppercase mb-2">Account Summary</div>
+          <div class="d-flex justify-between py-1 text-xs border-bottom">
+            <span class="text-muted">Role:</span>
+            <span class="fw-bold text-ink text-capitalize" id="summaryRole">{{ session.get('role') }}</span>
+          </div>
+          <div class="d-flex justify-between py-1 text-xs border-bottom">
+            <span class="text-muted">City / Region:</span>
+            <span class="fw-bold text-ink" id="summaryCity">Kolkata</span>
+          </div>
+          <div class="d-flex justify-between py-1 text-xs">
+            <span class="text-muted">Verification Status:</span>
+            <span class="fw-bold text-success"><i class="fa-solid fa-circle-check"></i> Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Profile Edit Form -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom p-3">
+          <h5 class="fw-bold text-ink mb-0"><i class="fa-solid fa-pen-to-square text-crimson me-2"></i>Edit Profile Information</h5>
+        </div>
+        <div class="card-body p-4">
+          <!-- Notification Alert for feedback -->
+          <div id="profileAlertPlaceholder"></div>
+
+          <form id="profileUpdateForm" onsubmit="handleProfileUpdate(event)">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Full Legal Name *</label>
+                <input type="text" class="form-control" id="profileFullName" required placeholder="e.g. Dr. Amitav Sengupta">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Email Address *</label>
+                <input type="email" class="form-control" id="profileEmail" required placeholder="user@example.com">
+                <div class="text-xs text-muted mt-1">Changes are synced immediately with your active session.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Contact Phone Number</label>
+                <input type="tel" class="form-control" id="profilePhone" placeholder="+91 98300 11223">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">City / Operational Region</label>
+                <input type="text" class="form-control" id="profileCity" placeholder="Kolkata">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Residential / Office Address</label>
+                <input type="text" class="form-control" id="profileAddress" placeholder="Street name, landmark, area, pin code">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Blood Group</label>
+                <select class="form-select fw-bold text-crimson" id="profileBloodGroup">
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Donor Availability Pattern</label>
+                <select class="form-select" id="profileAvailability">
+                  <option value="24_HOURS">24 Hours (Emergency Ready)</option>
+                  <option value="8_HOURS">8 Hours Working Shift</option>
+                  <option value="DAYTIME">Daytime Only (08:00 - 20:00)</option>
+                  <option value="NIGHTTIME">Nighttime Only (20:00 - 08:00)</option>
+                  <option value="TEMPORARILY_UNAVAILABLE">Temporarily Unavailable / Medical Deferral</option>
+                </select>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label text-xs fw-bold text-muted text-uppercase">Profile Photo URL (Optional)</label>
+                <input type="url" class="form-control" id="profilePhotoInput" placeholder="https://example.com/avatar.jpg" oninput="previewProfilePhoto(this.value)">
+                <div class="text-xs text-muted mt-1">Provide a public image link for your avatar.</div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-top d-flex justify-between align-center">
+              <span class="text-xs text-muted">All updates are saved securely to the unified database.</span>
+              <button type="submit" class="btn btn-primary" id="saveProfileBtn">
+                <i class="fa-solid fa-floppy-disk me-1"></i> Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadProfileData();
+});
+
+async function loadProfileData() {
+  try {
+    const res = await fetch('/api/profile');
+    const data = await res.json();
+    if (data.success && data.user) {
+      const u = data.user;
+      document.getElementById('profileFullName').value = u.full_name || '';
+      document.getElementById('profileEmail').value = u.email || '';
+      document.getElementById('profilePhone').value = u.phone || '';
+      document.getElementById('profileAddress').value = u.address || '';
+      document.getElementById('profileCity').value = u.city || 'Kolkata';
+      document.getElementById('profilePhotoInput').value = u.profile_photo || '';
+      document.getElementById('profileBloodGroup').value = data.blood_group || 'O+';
+      document.getElementById('profileAvailability').value = data.availability || '24_HOURS';
+
+      // Update sidebar/card display
+      document.getElementById('profileCardName').textContent = u.full_name;
+      document.getElementById('profileCardEmail').textContent = u.email;
+      document.getElementById('profileCardLocation').innerHTML = `<i class="fa-solid fa-location-dot me-1 text-crimson"></i> ${u.city || 'Kolkata'}`;
+      document.getElementById('profileCardBloodGroup').textContent = `Blood Group: ${data.blood_group || 'O+'}`;
+      document.getElementById('summaryCity').textContent = u.city || 'Kolkata';
+
+      if (u.profile_photo) {
+        previewProfilePhoto(u.profile_photo);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading profile:', err);
+  }
+}
+
+function previewProfilePhoto(url) {
+  const display = document.getElementById('profilePhotoDisplay');
+  if (url && url.trim().startsWith('http')) {
+    display.innerHTML = `<img src="${url}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">`;
+  } else {
+    const name = document.getElementById('profileFullName').value || 'U';
+    display.innerHTML = name.substring(0, 2).toUpperCase();
+  }
+}
+
+async function handleProfileUpdate(e) {
+  e.preventDefault();
+  const payload = {
+    full_name: document.getElementById('profileFullName').value.trim(),
+    email: document.getElementById('profileEmail').value.trim(),
+    phone: document.getElementById('profilePhone').value.trim(),
+    address: document.getElementById('profileAddress').value.trim(),
+    city: document.getElementById('profileCity').value.trim(),
+    blood_group: document.getElementById('profileBloodGroup').value,
+    availability: document.getElementById('profileAvailability').value,
+    profile_photo: document.getElementById('profilePhotoInput').value.trim() || null
+  };
+
+  const btn = document.getElementById('saveProfileBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...';
+
+  const alertContainer = document.getElementById('profileAlertPlaceholder');
+  alertContainer.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      alertContainer.innerHTML = `
+        <div class="alert alert-success d-flex align-center gap-2 mb-3">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>${result.message || 'Profile updated successfully.'}</span>
+        </div>
+      `;
+      loadProfileData();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Profile Updated', result.message, 'success');
+      }
+    } else {
+      alertContainer.innerHTML = `
+        <div class="alert alert-danger d-flex align-center gap-2 mb-3">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>${result.error || 'Failed to update profile.'}</span>
+        </div>
+      `;
+    }
+  } catch (err) {
+    alertContainer.innerHTML = `
+      <div class="alert alert-danger d-flex align-center gap-2 mb-3">
+        <i class="fa-solid fa-circle-xmark"></i>
+        <span>Network error saving profile changes.</span>
+      </div>
+    `;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Changes';
+  }
+}
+</script>
+{% endblock %}

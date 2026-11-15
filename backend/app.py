@@ -18,6 +18,10 @@ from backend.routes.auth import auth_bp
 from backend.routes.donor import donor_bp
 from backend.routes.patient import patient_bp
 from backend.routes.admin import admin_bp
+from backend.routes.family import family_bp
+from backend.routes.ngo import ngo_bp
+from backend.routes.profile import profile_bp
+from backend.routes.safety import safety_bp
 from backend.services.verification_service import sweep_and_update_donor_statuses
 
 
@@ -154,6 +158,10 @@ def create_app(config_class=Config):
     app.register_blueprint(donor_bp)
     app.register_blueprint(patient_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(family_bp)
+    app.register_blueprint(ngo_bp)
+    app.register_blueprint(profile_bp)
+    app.register_blueprint(safety_bp)
 
     # Ensure database schema is initialized if file doesn't exist
     if app.config.get("DATABASE_PATH") and app.config["DATABASE_PATH"] != ":memory:":
@@ -196,15 +204,14 @@ def create_app(config_class=Config):
         if 'user_id' in session:
             uid = session.get('user_id')
             user_loc = "Kolkata"
+            photo = None
             try:
                 conn = get_db()
-                role = session.get('role', 'donor')
-                if role == 'donor':
-                    prof = query_db("SELECT location FROM donor_profiles WHERE user_id = ?", (uid,), one=True, db=conn)
-                else:
-                    prof = query_db("SELECT location FROM patient_profiles WHERE user_id = ?", (uid,), one=True, db=conn)
-                if prof and prof.get("location"):
-                    user_loc = prof["location"]
+                u_row = query_db("SELECT city, profile_photo, role FROM users WHERE id = ?", (uid,), one=True, db=conn)
+                if u_row:
+                    if u_row.get("city"):
+                        user_loc = u_row["city"]
+                    photo = u_row.get("profile_photo")
             except Exception:
                 pass
 
@@ -213,7 +220,8 @@ def create_app(config_class=Config):
                 'name': session.get('user_name', 'User'),
                 'email': session.get('user_email', ''),
                 'role': session.get('role', 'donor'),
-                'location': user_loc
+                'location': user_loc,
+                'profile_photo': photo
             }
         return dict(current_user=user, is_logged_in=('user_id' in session))
 
@@ -266,6 +274,8 @@ def create_app(config_class=Config):
                 user = query_db("SELECT * FROM users WHERE email = ?", (email_val,), one=True, db=conn)
                 if not user:
                     error = f"No account found for '{email_val}'. Please verify your email or create a new account."
+                elif user.get("account_status") == "BLOCKED":
+                    error = "This account has been permanently blocked due to fraudulent registration or security violation."
                 elif not check_password_hash(user['password_hash'], password):
                     error = "Incorrect password. Please verify your security credentials and try again."
                 else:
@@ -285,6 +295,8 @@ def create_app(config_class=Config):
                     next_page = request.args.get('next')
                     if next_page and next_page.startswith('/'):
                         return redirect(next_page)
+                    if user['role'] == 'ngo':
+                        return redirect(url_for('ngo_dashboard'))
                     return redirect(url_for('home'))
 
         return render_template(
@@ -295,6 +307,15 @@ def create_app(config_class=Config):
             error=error,
             email=email_val
         )
+
+    @app.route('/ngo/login', methods=['GET', 'POST'])
+    @app.route('/login/ngo', methods=['GET', 'POST'])
+    def ngo_login():
+        if 'user_id' in session:
+            if session.get('role') == 'ngo':
+                return redirect(url_for('ngo_dashboard'))
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('login', role='ngo', next='/ngo'))
 
     @app.route('/register', methods=['GET', 'POST'])
     @app.route('/register.html', methods=['GET', 'POST'])
@@ -311,7 +332,7 @@ def create_app(config_class=Config):
             password = request.form.get('password') or ''
             role = (request.form.get('userRole') or active_role).strip().lower()
 
-            if role not in ('donor', 'patient'):
+            if role not in ('donor', 'patient', 'ngo'):
                 role = 'donor'
 
             if not full_name or not email or not password:
@@ -328,8 +349,8 @@ def create_app(config_class=Config):
                         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
                         hashed = generate_password_hash(password)
                         user_id, _ = execute_db(
-                            "INSERT INTO users (full_name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                            (full_name, email, hashed, role, now, now),
+                            "INSERT INTO users (full_name, email, password_hash, role, address, city, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (full_name, email, hashed, role, city, city, now, now),
                             db=conn
                         )
 
@@ -340,6 +361,36 @@ def create_app(config_class=Config):
                                    (user_id, blood_group, phone, location, availability, maximum_travel_distance, profile_status, last_verified_date, next_verification_date, created_at, updated_at)
                                    VALUES (?, ?, ?, ?, '24_HOURS', 15.0, 'ACTIVE', ?, ?, ?, ?)""",
                                 (user_id, blood_group, phone, city, now, next_due, now, now),
+                                db=conn
+                            )
+                        elif role == 'ngo':
+                            from backend.services.ngo_verification import verify_ngo_registration
+                            reg_num = (request.form.get('registrationNumber') or request.form.get('reg_number') or f"WB-NGO-{user_id}-2026").strip().upper()
+                            v_res = verify_ngo_registration(full_name, reg_num, email, phone=phone, city=city)
+                            if v_res["is_fraud"]:
+                                execute_db("UPDATE users SET account_status = 'BLOCKED' WHERE id = ?", (user_id,), db=conn)
+                                execute_db(
+                                    """INSERT INTO ngo_profiles
+                                       (user_id, ngo_name, registration_number, contact_person, phone, email, address, city, service_areas, verification_status, fraud_status, fraud_reason, created_at, updated_at)
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Kolkata Metropolitan Area', 'REJECTED', 'BLOCKED', ?, ?, ?)""",
+                                    (user_id, full_name, reg_num, full_name, phone, email, city, city, v_res["fraud_reason"], now, now),
+                                    db=conn
+                                )
+                                execute_db(
+                                    "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
+                                    (user_id, "FRAUD_NGO_BLOCKED", f"Blocked fraudulent NGO registration: {full_name} ({reg_num}) - {v_res['fraud_reason']}"),
+                                    db=conn
+                                )
+                                error = f"Registration Denied: {v_res['fraud_reason']} Fraudulent NGO registration attempts are prohibited and blocked by system security."
+                                return render_template('register.html', is_public_page=True, active_page='register', active_role=active_role, error=error)
+
+                            v_status = v_res["verification_status"]
+                            is_govt = 1 if v_res.get("is_govt_verified") else 0
+                            execute_db(
+                                """INSERT INTO ngo_profiles
+                                   (user_id, ngo_name, registration_number, contact_person, phone, email, address, city, service_areas, verification_status, govt_verified, fraud_status, created_at, updated_at)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Kolkata Metropolitan Area', ?, ?, 'CLEAN', ?, ?)""",
+                                (user_id, full_name, reg_num, full_name, phone, email, city, city, v_status, is_govt, now, now),
                                 db=conn
                             )
                         else:
@@ -393,8 +444,21 @@ def create_app(config_class=Config):
         real_activities = []
         real_donors = []
         critical_alert = None
+        family_members = []
         try:
             conn = get_db()
+            uid = session.get('user_id')
+            if uid:
+                family_members = query_db(
+                    """SELECT f.*,
+                              (SELECT COUNT(*) FROM blood_requests br 
+                               WHERE br.patient_id = f.user_id AND br.required_blood_group = f.blood_group AND br.request_status IN ('OPEN', 'MATCHING')) AS has_active_request
+                       FROM family_members f
+                       WHERE f.user_id = ?
+                       ORDER BY f.created_at ASC""",
+                    (uid,),
+                    db=conn
+                ) or []
             db_reqs = query_db(
                 """SELECT br.*, 
                           COUNT(r.id) AS total_sent,
@@ -469,7 +533,8 @@ def create_app(config_class=Config):
             requests=real_requests,
             activities=real_activities,
             dispatches=real_dispatches,
-            critical_alert=critical_alert
+            critical_alert=critical_alert,
+            family_members=family_members
         )
 
     @app.route('/donors')
@@ -583,8 +648,21 @@ def create_app(config_class=Config):
     @app.route('/requests.html')
     def requests():
         real_requests = []
+        family_members = []
         try:
             conn = get_db()
+            uid = session.get('user_id')
+            if uid:
+                family_members = query_db(
+                    """SELECT f.*,
+                              (SELECT COUNT(*) FROM blood_requests br 
+                               WHERE br.patient_id = f.user_id AND br.required_blood_group = f.blood_group AND br.request_status IN ('OPEN', 'MATCHING')) AS has_active_request
+                       FROM family_members f
+                       WHERE f.user_id = ?
+                       ORDER BY f.created_at ASC""",
+                    (uid,),
+                    db=conn
+                ) or []
             db_reqs = query_db(
                 """SELECT br.*, 
                           COUNT(r.id) AS total_sent,
@@ -673,6 +751,42 @@ def create_app(config_class=Config):
             is_public_page=False,
             active_page='availability'
         )
+
+    @app.route('/family')
+    @app.route('/my-family')
+    @app.route('/family.html')
+    def family():
+        if 'user_id' not in session:
+            return redirect(url_for('login', next='/family'))
+        return render_template('family.html', is_public_page=False, active_page='family')
+
+    @app.route('/ngo')
+    @app.route('/ngo/dashboard')
+    @app.route('/ngo.html')
+    def ngo_dashboard():
+        if 'user_id' not in session:
+            return redirect(url_for('login', next='/ngo'))
+        role = session.get('role', '').lower()
+        if role not in ('ngo', 'admin'):
+            flash("The NGO Operations Portal is reserved exclusively for registered blood donation NGOs. Donors and patients can manage requests from the Operations Dashboard.", "info")
+            return redirect(url_for('dashboard'))
+        return render_template('ngo_dashboard.html', is_public_page=False, active_page='ngo')
+
+    @app.route('/profile')
+    @app.route('/settings/profile')
+    @app.route('/profile.html')
+    def profile():
+        if 'user_id' not in session:
+            return redirect(url_for('login', next='/profile'))
+        return render_template('profile.html', is_public_page=False, active_page='profile')
+
+    @app.route('/blocked-accounts')
+    @app.route('/settings/blocked')
+    @app.route('/blocked.html')
+    def blocked_accounts():
+        if 'user_id' not in session:
+            return redirect(url_for('login', next='/blocked-accounts'))
+        return render_template('blocked_accounts.html', is_public_page=False, active_page='blocked_accounts')
 
     # ── Supplementary API Endpoints ──────────────────────────────
 

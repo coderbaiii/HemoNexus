@@ -1,0 +1,900 @@
+{% extends "base.html" %}
+
+{% block title %}NGO Operations Portal - Blood Donation Coordination | HemoNexus{% endblock %}
+
+{% block content %}
+<div class="ngo-portal-container">
+  <!-- Page Header -->
+  <div class="page-header d-flex justify-between align-center flex-wrap gap-3 mb-4">
+    <div>
+      <div class="d-flex align-center gap-2">
+        <h1 class="page-title mb-0">NGO Blood Donation Portal</h1>
+        <span class="badge" id="ngoVerificationBadge" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid #0284c7;">
+          <i class="fa-solid fa-spinner fa-spin me-1"></i> Checking Verification...
+        </span>
+      </div>
+      <p class="page-subtitle text-muted mt-1">Authorized outreach for community blood drives, patient support, and emergency donor coordination.</p>
+    </div>
+    <div class="page-actions d-flex gap-2">
+      <button class="btn btn-outline-primary btn-sm" onclick="switchNgoTab('profileTab')">
+        <i class="fa-solid fa-id-card me-1"></i> Organization Profile
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="switchNgoTab('searchTab')">
+        <i class="fa-solid fa-magnifying-glass me-1"></i> Donor Recommendation Engine
+      </button>
+    </div>
+  </div>
+
+  <!-- Verification Warning Banner (shown if NGO is PENDING or REJECTED) -->
+  <div class="card border-0 shadow-sm mb-4 d-none" id="ngoPendingNotice" style="border-left: 4px solid #f59e0b !important; background: #fffbeb;">
+    <div class="card-body p-3 d-flex align-center justify-between flex-wrap gap-3">
+      <div class="d-flex align-center gap-3">
+        <div class="text-warning"><i class="fa-solid fa-shield-halved fa-2x"></i></div>
+        <div>
+          <div class="fw-bold text-ink">Administrative Verification Pending</div>
+          <div class="text-xs text-muted">Your organization profile is under review by HemoNexus compliance officers. Donor contact requests are temporarily restricted to protect donor privacy.</div>
+        </div>
+      </div>
+      <button class="btn btn-outline-warning btn-sm" onclick="switchNgoTab('profileTab')">Review Organization Profile</button>
+    </div>
+  </div>
+
+  <!-- NGO Navigation Tabs -->
+  <ul class="nav nav-tabs mb-4 border-bottom">
+    <li class="nav-item">
+      <button class="nav-link active fw-semibold" id="tabBtnSearch" onclick="switchNgoTab('searchTab')">
+        <i class="fa-solid fa-wand-magic-sparkles me-1 text-crimson"></i> Donor Recommendations &amp; Search
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link fw-semibold" id="tabBtnRequests" onclick="switchNgoTab('requestsTab')">
+        <i class="fa-solid fa-paper-plane me-1 text-primary"></i> Outreach Requests Tracker
+        <span class="badge badge-primary ms-1" id="ngoRequestsCountBadge">0</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link fw-semibold" id="tabBtnPatientRequests" onclick="switchNgoTab('patientRequestsTab')">
+        <i class="fa-solid fa-hospital-user me-1 text-danger"></i> Patient Requisitions
+        <span class="badge bg-danger ms-1" id="ngoPatientReqCountBadge">0</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link fw-semibold" id="tabBtnProfile" onclick="switchNgoTab('profileTab')">
+        <i class="fa-solid fa-building-ngo me-1 text-teal"></i> NGO Profile &amp; Accreditation
+      </button>
+    </li>
+  </ul>
+
+  <!-- TAB 1: Search & Smart Donor Recommendations -->
+  <div id="searchTab" class="ngo-tab-pane">
+    <!-- Filter Controls Card -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-3">
+        <div class="row g-2 align-center">
+          <div class="col-md-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase mb-1">Blood Group</label>
+            <select class="form-select form-select-sm" id="filterBloodGroup" onchange="fetchNgoDonors()">
+              <option value="">All Blood Groups</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase mb-1">Location / City</label>
+            <input type="text" class="form-control form-control-sm" id="filterCity" placeholder="Kolkata, Salt Lake..." oninput="debounceFetchDonors()">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase mb-1">Availability</label>
+            <select class="form-select form-select-sm" id="filterAvailability" onchange="fetchNgoDonors()">
+              <option value="ALL">All Availabilities</option>
+              <option value="24_HOURS">24 Hours Emergency</option>
+              <option value="DAYTIME">Daytime Only</option>
+              <option value="NIGHTTIME">Nighttime Only</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase mb-1">Ranking / Sort By</label>
+            <select class="form-select form-select-sm" id="filterSort" onchange="fetchNgoDonors()">
+              <option value="best_match">Best Match (Recommendation Score)</option>
+              <option value="donation_history">Donation History (Most Donations)</option>
+              <option value="reliability">Response Reliability (% Accepted)</option>
+              <option value="availability">Emergency Availability First</option>
+              <option value="compatibility">Blood Group Compatibility</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Privacy Disclaimer Badge -->
+    <div class="alert alert-info py-2 px-3 mb-3 d-flex align-center gap-2 rounded-lg text-xs" style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); color: #0369a1;">
+      <i class="fa-solid fa-lock"></i>
+      <span><strong>Donor Privacy Protocol Active:</strong> Direct phone numbers and email addresses are masked by default. When an outreach request is accepted by the donor, full contact details are securely released.</span>
+    </div>
+
+    <!-- Donors List Grid -->
+    <div id="ngoDonorsList" class="row g-3">
+      <div class="col-12 text-center py-5 text-muted">
+        <i class="fa-solid fa-spinner fa-spin fa-2x mb-3 text-crimson"></i>
+        <p>Loading smart donor recommendations...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Outreach Requests Tracker -->
+  <div id="requestsTab" class="ngo-tab-pane d-none">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom p-3 d-flex justify-between align-center">
+        <div class="fw-bold text-ink d-flex align-center gap-2">
+          <i class="fa-solid fa-paper-plane text-primary"></i>
+          <span>Submitted Outreach &amp; Contact Requests</span>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" onclick="fetchNgoRequests()">
+          <i class="fa-solid fa-rotate-right me-1"></i> Refresh
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="ngoRequestsTable">
+          <thead class="bg-light text-xs text-muted text-uppercase">
+            <tr>
+              <th class="ps-3">Donor Name</th>
+              <th>Required Group</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Direct Contact</th>
+              <th>Sent At</th>
+              <th class="text-end pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ngoRequestsTableBody">
+            <tr>
+              <td colspan="7" class="text-center py-4 text-muted">Loading requests...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: NGO Profile Settings -->
+  <div id="profileTab" class="ngo-tab-pane d-none">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom p-3">
+        <h5 class="fw-bold text-ink mb-0"><i class="fa-solid fa-building-ngo text-crimson me-2"></i>Organization Profile &amp; Verification</h5>
+      </div>
+      <div class="card-body p-4">
+        <form id="ngoProfileForm" onsubmit="handleSaveNgoProfile(event)">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Organization Legal Name *</label>
+              <input type="text" class="form-control" id="ngoNameInput" required placeholder="e.g. LifeStream Foundation">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Registration / Society Number *</label>
+              <input type="text" class="form-control" id="ngoRegNumInput" required placeholder="e.g. WB/2026/0014523">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Official Contact Person *</label>
+              <input type="text" class="form-control" id="ngoContactPersonInput" required placeholder="Full Name of Coordinator">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Official Phone Number</label>
+              <input type="tel" class="form-control" id="ngoPhoneInput" placeholder="+91 98300 00000">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Official Email Address</label>
+              <input type="email" class="form-control" id="ngoEmailInput" placeholder="contact@organization.org">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Headquarters / City</label>
+              <input type="text" class="form-control" id="ngoCityInput" placeholder="Kolkata">
+            </div>
+            <div class="col-12">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Office Address</label>
+              <input type="text" class="form-control" id="ngoAddressInput" placeholder="Registered office building, street, area">
+            </div>
+            <div class="col-12">
+              <label class="form-label text-xs fw-bold text-muted text-uppercase">Active Service Areas</label>
+              <input type="text" class="form-control" id="ngoServiceAreasInput" placeholder="Kolkata Metropolitan Area, Howrah, North 24 Parganas">
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-top d-flex justify-between align-center">
+            <span class="text-xs text-muted">Accreditation documents are reviewed by HemoNexus administrative staff.</span>
+            <button type="submit" class="btn btn-primary" id="saveNgoProfileBtn">
+              <i class="fa-solid fa-floppy-disk me-1"></i> Update NGO Profile
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Patient Blood Requisitions -->
+  <div id="patientRequestsTab" class="ngo-tab-pane d-none">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom p-3 d-flex justify-between align-center flex-wrap gap-2">
+        <div>
+          <h5 class="fw-bold text-ink mb-0"><i class="fa-solid fa-hospital-user text-crimson me-2"></i>Incoming Patient Blood Requisitions</h5>
+          <p class="text-xs text-muted mb-0">Emergency and scheduled blood unit requests submitted by hospital patients to your organization.</p>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" onclick="fetchNgoPatientRequests()">
+          <i class="fa-solid fa-rotate-right me-1"></i> Refresh Requests
+        </button>
+      </div>
+      <div class="card-body p-4">
+        <div id="ngoPatientRequestsList" class="row g-3">
+          <div class="col-12 text-center py-4 text-muted">
+            <i class="fa-solid fa-spinner fa-spin me-2 text-primary"></i> Loading patient requisitions...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Send Contact Request to Donor -->
+<div class="modal fade" id="ngoContactModal" tabindex="-1" aria-hidden="true" style="display: none; background: rgba(15, 23, 42, 0.6);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 0.75rem;">
+      <div class="modal-header border-bottom p-3">
+        <h5 class="modal-title fw-bold text-ink">
+          <i class="fa-solid fa-paper-plane text-crimson me-2"></i>Initiate Donor Outreach
+        </h5>
+        <button type="button" class="btn-close" onclick="closeContactModal()"></button>
+      </div>
+      <form id="ngoContactForm" onsubmit="handleSendContactRequest(event)">
+        <input type="hidden" id="contactDonorId" value="">
+        <div class="modal-body p-4">
+          <div class="d-flex align-center gap-3 p-3 bg-light rounded-lg mb-3">
+            <div class="blood-badge" style="background: rgba(225, 29, 72, 0.1); color: var(--crimson); font-weight: 800; font-size: 1.2rem; padding: 0.3rem 0.7rem; border-radius: 0.5rem;" id="contactModalBlood">
+              O+
+            </div>
+            <div>
+              <div class="fw-bold text-ink" id="contactModalDonorName">Donor Name</div>
+              <div class="text-xs text-muted" id="contactModalDonorLoc">Location</div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase">Required Blood Group *</label>
+            <select class="form-select" id="contactBloodGroup" required>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase">Message to Donor</label>
+            <textarea class="form-control" id="contactMessage" rows="3" placeholder="State the purpose of your blood donation request, hospital, or scheduled drive..."></textarea>
+          </div>
+
+          <div class="alert alert-light border p-2 text-xs text-muted">
+            <i class="fa-solid fa-lock text-crimson me-1"></i>
+            The donor will receive a notification and can accept or decline. Upon acceptance, their verified phone and email will be revealed in your Outreach Tracker.
+          </div>
+        </div>
+        <div class="modal-footer border-top p-3 d-flex justify-between">
+          <button type="button" class="btn btn-outline-secondary" onclick="closeContactModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitContactBtn">
+            <i class="fa-solid fa-paper-plane me-1"></i> Send Contact Request
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: NGO Dispatch Response to Patient -->
+<div class="modal fade" id="ngoRespondPatientModal" tabindex="-1" aria-hidden="true" style="display: none; background: rgba(15, 23, 42, 0.6);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 0.75rem;">
+      <div class="modal-header border-bottom p-3">
+        <h5 class="modal-title fw-bold text-ink">
+          <i class="fa-solid fa-paper-plane text-crimson me-2"></i>Dispatch Response to Patient
+        </h5>
+        <button type="button" class="btn-close" onclick="closeNgoRespondModal()"></button>
+      </div>
+      <form id="ngoRespondForm" onsubmit="handleNgoRespondSubmit(event)">
+        <input type="hidden" id="respondReqId" value="">
+        <div class="modal-body p-4">
+          <div class="p-3 bg-light rounded-lg border mb-3">
+            <div class="d-flex justify-between align-center">
+              <div>
+                <div class="fw-bold text-ink" id="respondPatientName">Patient Name</div>
+                <div class="text-xs text-muted" id="respondHospital">Hospital Name</div>
+              </div>
+              <span class="blood-badge" id="respondBloodBadge" style="background: rgba(225,29,72,0.1); color: var(--crimson); font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 0.3rem;">O+</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase">Dispatch Response Message to Patient *</label>
+            <textarea class="form-control" id="respondCustomMsg" rows="3" required placeholder="e.g. 2 units of O+ blood have been reserved at our blood bank. Please bring doctor prescription to Counter 3."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-top p-3 d-flex justify-between">
+          <button type="button" class="btn btn-outline-secondary" onclick="closeNgoRespondModal()">Cancel</button>
+          <button type="submit" class="btn btn-success" id="btnSendNgoResponse">
+            <i class="fa-solid fa-check me-1"></i> Accept &amp; Dispatch Message
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+let ngoProfile = null;
+let debounceTimer = null;
+const userRole = "{{ session.get('role', '') }}".toLowerCase();
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadNgoProfile();
+  fetchNgoDonors();
+  fetchNgoRequests();
+  fetchNgoPatientRequests();
+});
+
+function switchNgoTab(tabId) {
+  document.querySelectorAll('.ngo-tab-pane').forEach(el => el.classList.add('d-none'));
+  const target = document.getElementById(tabId);
+  if (target) target.classList.remove('d-none');
+
+  document.querySelectorAll('.nav-tabs .nav-link').forEach(btn => btn.classList.remove('active'));
+  if (tabId === 'searchTab') document.getElementById('tabBtnSearch').classList.add('active');
+  if (tabId === 'requestsTab') document.getElementById('tabBtnRequests').classList.add('active');
+  if (tabId === 'profileTab') document.getElementById('tabBtnProfile').classList.add('active');
+  if (tabId === 'patientRequestsTab') {
+    const btn = document.getElementById('tabBtnPatientRequests');
+    if (btn) btn.classList.add('active');
+    fetchNgoPatientRequests();
+  }
+}
+
+async function loadNgoProfile() {
+  try {
+    const res = await fetch('/api/ngo/profile');
+    const data = await res.json();
+    if (data.success && data.profile) {
+      ngoProfile = data.profile;
+      const status = (ngoProfile.verification_status || 'PENDING').toUpperCase();
+      const badge = document.getElementById('ngoVerificationBadge');
+      if (status === 'VERIFIED') {
+        badge.className = 'badge bg-success';
+        badge.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> Verified Organization';
+        document.getElementById('ngoPendingNotice').classList.add('d-none');
+      } else {
+        badge.className = 'badge bg-warning text-dark';
+        badge.innerHTML = '<i class="fa-solid fa-clock me-1"></i> Verification Pending';
+        document.getElementById('ngoPendingNotice').classList.remove('d-none');
+      }
+
+      // Pre-fill profile form
+      document.getElementById('ngoNameInput').value = ngoProfile.ngo_name || '';
+      document.getElementById('ngoRegNumInput').value = ngoProfile.registration_number || '';
+      document.getElementById('ngoContactPersonInput').value = ngoProfile.contact_person || '';
+      document.getElementById('ngoPhoneInput').value = ngoProfile.phone || '';
+      document.getElementById('ngoEmailInput').value = ngoProfile.email || '';
+      document.getElementById('ngoCityInput').value = ngoProfile.city || '';
+      document.getElementById('ngoAddressInput').value = ngoProfile.address || '';
+      document.getElementById('ngoServiceAreasInput').value = ngoProfile.service_areas || '';
+    } else {
+      document.getElementById('ngoVerificationBadge').innerHTML = '<i class="fa-solid fa-circle-exclamation me-1"></i> Profile Setup Required';
+      switchNgoTab('profileTab');
+    }
+  } catch (err) {
+    console.error('Error fetching NGO profile:', err);
+  }
+}
+
+function debounceFetchDonors() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(fetchNgoDonors, 300);
+}
+
+async function fetchNgoDonors() {
+  const container = document.getElementById('ngoDonorsList');
+  const blood = document.getElementById('filterBloodGroup').value;
+  const city = document.getElementById('filterCity').value.trim();
+  const avail = document.getElementById('filterAvailability').value;
+  const sort = document.getElementById('filterSort').value;
+
+  const params = new URLSearchParams();
+  if (blood) params.append('blood_group', blood);
+  if (city) params.append('city', city);
+  if (avail && avail !== 'ALL') params.append('availability', avail);
+  if (sort) params.append('sort', sort);
+
+  try {
+    const res = await fetch(`/api/ngo/donors?${params.toString()}`);
+    const data = await res.json();
+    if (data.success) {
+      renderNgoDonors(data.donors, data.is_ngo_verified);
+    } else {
+      container.innerHTML = `<div class="col-12 alert alert-danger">${data.error || 'Failed to fetch donors.'}</div>`;
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="col-12 alert alert-danger">Error connecting to server.</div>`;
+  }
+}
+
+function renderNgoDonors(donors, isVerified) {
+  const container = document.getElementById('ngoDonorsList');
+  if (!donors || donors.length === 0) {
+    container.innerHTML = `
+      <div class="col-12 text-center py-5 text-muted">
+        <i class="fa-solid fa-users-slash fa-3x mb-3 text-muted"></i>
+        <h5>No Matching Eligible Donors Found</h5>
+        <p class="text-sm">Try widening your search criteria or resetting filters.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  donors.forEach(d => {
+    const score = d.recommendation_score || 85.0;
+    const isRevealed = d.is_contact_revealed;
+    const status = d.contact_request_status;
+
+    html += `
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border shadow-sm position-relative" style="border-radius: 0.75rem;">
+          <div class="card-body p-4 d-flex flex-column justify-between">
+            <div>
+              <div class="d-flex justify-between align-start mb-2">
+                <div>
+                  <h5 class="fw-bold text-ink mb-0">${escapeHtml(d.name)}</h5>
+                  <div class="text-xs text-muted"><i class="fa-solid fa-location-dot me-1"></i> ${escapeHtml(d.location)}</div>
+                </div>
+                <div class="blood-badge" style="background: rgba(225, 29, 72, 0.1); color: var(--crimson); border: 2px solid var(--crimson); font-weight: 800; font-size: 1.1rem; padding: 0.2rem 0.5rem; border-radius: 0.4rem;">
+                  ${escapeHtml(d.blood_group)}
+                </div>
+              </div>
+
+              <!-- Recommendation Score Badge -->
+              <div class="d-flex align-center justify-between mb-3 py-1 px-2 rounded bg-light border">
+                <span class="text-xs fw-semibold text-muted">Match Suitability</span>
+                <span class="fw-bold text-success text-sm">${score}%</span>
+              </div>
+
+              <!-- Why Recommended Tags -->
+              <div class="d-flex flex-wrap gap-1 mb-3">
+                ${(d.recommendation_reasons || []).map(r => `<span class="badge bg-light text-muted border text-xs">${escapeHtml(r)}</span>`).join('')}
+              </div>
+
+              <!-- Metrics -->
+              <div class="row g-2 text-xs text-muted mb-3 border-top pt-2">
+                <div class="col-6">
+                  <strong>Total Donations:</strong> ${d.total_donations || 0}
+                </div>
+                <div class="col-6">
+                  <strong>Reliability:</strong> ${d.response_reliability}%
+                </div>
+              </div>
+
+              <!-- Privacy Gated Contact Details -->
+              <div class="p-2 rounded bg-light border text-xs">
+                ${isRevealed ? `
+                  <div class="text-success fw-bold mb-1"><i class="fa-solid fa-unlock me-1"></i> Contact Consent Granted</div>
+                  <div><i class="fa-solid fa-phone me-1"></i> ${escapeHtml(d.phone)}</div>
+                  <div><i class="fa-solid fa-envelope me-1"></i> ${escapeHtml(d.email)}</div>
+                ` : `
+                  <div class="text-muted"><i class="fa-solid fa-lock text-crimson me-1"></i> Phone: <code>${escapeHtml(d.phone)}</code></div>
+                  <div class="text-muted"><i class="fa-solid fa-lock text-crimson me-1"></i> Email: <code>${escapeHtml(d.email)}</code></div>
+                `}
+              </div>
+            </div>
+
+            <div class="mt-3 pt-2 border-top">
+              ${isRevealed ? `
+                <button class="btn btn-outline-success btn-sm w-100" disabled>
+                  <i class="fa-solid fa-check me-1"></i> Contact Connected
+                </button>
+              ` : (status === 'PENDING' ? `
+                <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+                  <i class="fa-solid fa-clock me-1"></i> Request Awaiting Consent
+                </button>
+              ` : `
+                <button class="btn btn-primary btn-sm w-100" onclick="openContactModal(${d.user_id}, '${escapeHtml(d.name)}', '${escapeHtml(d.blood_group)}', '${escapeHtml(d.location)}')">
+                  <i class="fa-solid fa-paper-plane me-1"></i> Send Contact Request
+                </button>
+              `)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function openContactModal(donorId, name, blood, loc) {
+  document.getElementById('contactDonorId').value = donorId;
+  document.getElementById('contactModalDonorName').textContent = name;
+  document.getElementById('contactModalBlood').textContent = blood;
+  document.getElementById('contactModalDonorLoc').textContent = loc;
+  document.getElementById('contactBloodGroup').value = blood;
+  document.getElementById('contactMessage').value = `Urgent outreach from ${ngoProfile ? ngoProfile.ngo_name : 'NGO'} regarding blood donation matching for ${blood}.`;
+  
+  const modal = document.getElementById('ngoContactModal');
+  modal.style.display = 'block';
+  modal.classList.add('show');
+}
+
+function closeContactModal() {
+  const modal = document.getElementById('ngoContactModal');
+  modal.style.display = 'none';
+  modal.classList.remove('show');
+}
+
+async function handleSendContactRequest(e) {
+  e.preventDefault();
+  const donorId = document.getElementById('contactDonorId').value;
+  const payload = {
+    donor_id: donorId,
+    required_blood_group: document.getElementById('contactBloodGroup').value,
+    message: document.getElementById('contactMessage').value.trim()
+  };
+
+  const btn = document.getElementById('submitContactBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
+
+  try {
+    const res = await fetch('/api/ngo/contact-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      closeContactModal();
+      fetchNgoDonors();
+      fetchNgoRequests();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Request Sent', result.message, 'success');
+      } else {
+        alert(result.message);
+      }
+    } else {
+      alert(result.error || 'Failed to send outreach request.');
+    }
+  } catch (err) {
+    alert('Network error sending request.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Send Contact Request';
+  }
+}
+
+async function fetchNgoRequests() {
+  try {
+    const res = await fetch('/api/ngo/contact-requests');
+    const data = await res.json();
+    if (data.success) {
+      renderNgoRequests(data.contact_requests || []);
+      document.getElementById('ngoRequestsCountBadge').textContent = (data.contact_requests || []).length;
+    }
+  } catch (err) {
+    console.error('Error fetching NGO requests:', err);
+  }
+}
+
+function renderNgoRequests(requests) {
+  const tbody = document.getElementById('ngoRequestsTableBody');
+  if (!requests || requests.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No outreach requests submitted yet. Use the recommendation engine to find donors.</td></tr>`;
+    return;
+  }
+
+  let html = '';
+  requests.forEach(r => {
+    let badgeClass = 'bg-secondary';
+    if (r.status === 'ACCEPTED') badgeClass = 'bg-success';
+    if (r.status === 'PENDING') badgeClass = 'bg-warning text-dark';
+    if (r.status === 'DECLINED') badgeClass = 'bg-danger';
+    if (r.status === 'COMPLETED') badgeClass = 'bg-info text-dark';
+
+    html += `
+      <tr>
+        <td class="ps-3 fw-bold text-ink">${escapeHtml(r.donor_name)}</td>
+        <td><span class="badge bg-light text-danger border fw-bold">${escapeHtml(r.required_blood_group)}</span></td>
+        <td class="text-xs text-muted">${escapeHtml(r.donor_location || 'Kolkata')}</td>
+        <td><span class="badge ${badgeClass}">${escapeHtml(r.status)}</span></td>
+        <td class="text-xs">
+          ${r.is_contact_revealed ? `
+            <div class="fw-bold text-success">${escapeHtml(r.phone)}</div>
+            <div class="text-muted">${escapeHtml(r.email)}</div>
+          ` : `
+            <span class="text-muted"><i class="fa-solid fa-lock text-crimson me-1"></i> Protected</span>
+          `}
+        </td>
+        <td class="text-xs text-muted">${(r.created_at || '').substring(0, 16)}</td>
+        <td class="text-end pe-3">
+          ${r.status === 'ACCEPTED' ? `
+            <button class="btn btn-outline-info btn-sm" onclick="markRequestCompleted(${r.id})">
+              <i class="fa-solid fa-check-double me-1"></i> Complete
+            </button>
+          ` : '-'}
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+async function markRequestCompleted(id) {
+  try {
+    const res = await fetch(`/api/ngo/contact-requests/${id}/complete`, { method: 'POST' });
+    const result = await res.json();
+    if (result.success) {
+      fetchNgoRequests();
+    }
+  } catch (err) {
+    alert('Error updating request.');
+  }
+}
+
+async function handleSaveNgoProfile(e) {
+  e.preventDefault();
+  const payload = {
+    ngo_name: document.getElementById('ngoNameInput').value.trim(),
+    registration_number: document.getElementById('ngoRegNumInput').value.trim(),
+    contact_person: document.getElementById('ngoContactPersonInput').value.trim(),
+    phone: document.getElementById('ngoPhoneInput').value.trim(),
+    email: document.getElementById('ngoEmailInput').value.trim(),
+    city: document.getElementById('ngoCityInput').value.trim(),
+    address: document.getElementById('ngoAddressInput').value.trim(),
+    service_areas: document.getElementById('ngoServiceAreasInput').value.trim()
+  };
+
+  const btn = document.getElementById('saveNgoProfileBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Updating...';
+
+  try {
+    const res = await fetch('/api/ngo/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      loadNgoProfile();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Profile Updated', result.message, 'success');
+      } else {
+        alert(result.message);
+      }
+    } else {
+      alert(result.error || 'Failed to update profile.');
+    }
+  } catch (err) {
+    alert('Network error updating profile.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Update NGO Profile';
+  }
+}
+
+async function fetchNgoPatientRequests() {
+  const container = document.getElementById('ngoPatientRequestsList');
+  if (!container) return;
+  try {
+    const res = await fetch('/api/ngo/patient-requests');
+    const data = await res.json();
+    if (data.success) {
+      renderNgoPatientRequests(data.requests);
+    } else {
+      container.innerHTML = `<div class="col-12 alert alert-danger">${data.error || 'Failed to fetch patient requests.'}</div>`;
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="col-12 alert alert-danger">Error connecting to server.</div>`;
+  }
+}
+
+function renderNgoPatientRequests(requests) {
+  const container = document.getElementById('ngoPatientRequestsList');
+  if (!container) return;
+  if (!requests || requests.length === 0) {
+    container.innerHTML = `
+      <div class="col-12 text-center py-5 text-muted">
+        <i class="fa-solid fa-bed-pulse fa-3x mb-3 text-muted"></i>
+        <h5>No Patient Blood Requisitions Yet</h5>
+        <p class="text-sm">When hospital patients submit requisitions directly to your NGO, they will appear here in real-time.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  requests.forEach(r => {
+    const isPending = (r.status || '').toUpperCase() === 'PENDING';
+    const isAccepted = (r.status || '').toUpperCase() === 'ACCEPTED';
+    const isFulfilled = (r.status || '').toUpperCase() === 'FULFILLED';
+    const isDeclined = (r.status || '').toUpperCase() === 'DECLINED';
+    const isUrgent = (r.urgency || '').toUpperCase() === 'CRITICAL' || (r.urgency || '').toUpperCase() === 'URGENT';
+
+    let badgeClass = 'bg-secondary';
+    if (isPending) badgeClass = 'bg-warning text-dark';
+    if (isAccepted) badgeClass = 'bg-info text-dark';
+    if (isFulfilled) badgeClass = 'bg-success';
+    if (isDeclined) badgeClass = 'bg-danger';
+
+    html += `
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border shadow-sm" style="border-radius: 0.75rem;">
+          <div class="card-body p-4 d-flex flex-column justify-between">
+            <div>
+              <div class="d-flex justify-between align-start mb-2">
+                <div>
+                  <h5 class="fw-bold text-ink mb-0">${escapeHtml(r.patient_name || 'Patient')}</h5>
+                  <div class="text-xs text-muted"><i class="fa-solid fa-hospital me-1"></i> ${escapeHtml(r.hospital_name || 'Medical Center')}</div>
+                </div>
+                <div class="blood-badge" style="background: rgba(225, 29, 72, 0.1); color: var(--crimson); border: 2px solid var(--crimson); font-weight: 800; font-size: 1.1rem; padding: 0.2rem 0.5rem; border-radius: 0.4rem;">
+                  ${escapeHtml(r.blood_group)}
+                </div>
+              </div>
+
+              <div class="d-flex align-center justify-between mb-3 py-1 px-2 rounded bg-light border text-xs">
+                <span><strong>Required Units:</strong> ${r.units_needed || 1} Unit(s)</span>
+                <span class="badge ${isUrgent ? 'bg-danger' : 'bg-secondary'}">${escapeHtml(r.urgency || 'STANDARD')}</span>
+              </div>
+
+              <div class="p-2 rounded bg-light border text-xs mb-3">
+                <div class="mb-1"><i class="fa-solid fa-phone me-1 text-muted"></i> <strong>Contact:</strong> ${escapeHtml(r.patient_phone || 'Protected / On Requisition')}</div>
+                <div><i class="fa-solid fa-envelope me-1 text-muted"></i> ${escapeHtml(r.patient_email || 'N/A')}</div>
+                ${r.city ? `<div class="mt-1"><i class="fa-solid fa-location-dot me-1 text-muted"></i> ${escapeHtml(r.city)}</div>` : ''}
+              </div>
+
+              ${r.notes ? `
+                <div class="text-xs text-slate-700 bg-white p-2 rounded border mb-3">
+                  <i class="fa-solid fa-notes-medical text-crimson me-1"></i> ${escapeHtml(r.notes)}
+                </div>
+              ` : ''}
+
+              ${r.custom_message ? `
+                <div class="alert alert-success p-2 text-xs mb-3">
+                  <strong><i class="fa-solid fa-paper-plane me-1"></i> Your Dispatched Message:</strong><br>
+                  ${escapeHtml(r.custom_message)}
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="pt-2 border-top">
+              <div class="d-flex justify-between align-center mb-2">
+                <span class="text-xs text-muted">Status:</span>
+                <span class="badge ${badgeClass}">${escapeHtml(r.status)}</span>
+              </div>
+
+              ${isPending ? `
+                <div class="d-flex gap-2">
+                  <button class="btn btn-success btn-sm flex-1" onclick="openNgoRespondModal(${r.id}, '${escapeHtml(r.patient_name)}', '${escapeHtml(r.hospital_name || '')}', '${escapeHtml(r.blood_group)}')">
+                    <i class="fa-solid fa-paper-plane me-1"></i> Accept &amp; Respond
+                  </button>
+                  <button class="btn btn-outline-danger btn-sm" onclick="declinePatientRequest(${r.id})" title="Decline Request">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              ` : (isAccepted ? `
+                <button class="btn btn-primary btn-sm w-100" onclick="fulfillPatientRequest(${r.id})">
+                  <i class="fa-solid fa-circle-check me-1"></i> Mark Blood Units Fulfilled
+                </button>
+              ` : (isFulfilled ? `
+                <div class="text-center text-success text-xs fw-bold py-1">
+                  <i class="fa-solid fa-check-double me-1"></i> Request Completed &amp; Fulfilled
+                </div>
+              ` : `
+                <div class="text-center text-muted text-xs py-1">
+                  <i class="fa-solid fa-ban me-1"></i> Request Declined
+                </div>
+              `))}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function openNgoRespondModal(id, patientName, hospital, bloodGroup) {
+  document.getElementById('respondReqId').value = id;
+  document.getElementById('respondPatientName').textContent = patientName;
+  document.getElementById('respondHospital').textContent = hospital || 'Medical Facility';
+  document.getElementById('respondBloodBadge').textContent = bloodGroup;
+  document.getElementById('respondCustomMsg').value = 'We have verified your blood requisition. Our NGO has arranged the requested units for you. Please visit our desk or contact our coordinator immediately.';
+  document.getElementById('ngoRespondPatientModal').style.display = 'block';
+}
+
+function closeNgoRespondModal() {
+  document.getElementById('ngoRespondPatientModal').style.display = 'none';
+}
+
+async function handleNgoRespondSubmit(e) {
+  e.preventDefault();
+  const reqId = document.getElementById('respondReqId').value;
+  const msg = document.getElementById('respondCustomMsg').value.trim();
+  const btn = document.getElementById('btnSendNgoResponse');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Dispatching...';
+
+  try {
+    const res = await fetch(`/api/ngo/patient-requests/${reqId}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_message: msg })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Response Dispatched', data.message || 'Dispatched response to patient successfully.', 'success');
+      } else {
+        alert(data.message || 'Dispatched response to patient successfully.');
+      }
+      closeNgoRespondModal();
+      fetchNgoPatientRequests();
+    } else {
+      alert(data.error || 'Failed to dispatch response.');
+    }
+  } catch (err) {
+    alert('Network error dispatching response.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Accept &amp; Dispatch Message';
+  }
+}
+
+async function declinePatientRequest(reqId) {
+  if (!confirm('Are you sure you want to decline this patient requisition?')) return;
+  try {
+    const res = await fetch(`/api/ngo/patient-requests/${reqId}/decline`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Requisition Declined', data.message, 'info');
+      }
+      fetchNgoPatientRequests();
+    } else {
+      alert(data.error || 'Could not decline requisition.');
+    }
+  } catch (err) {
+    alert('Network error declining requisition.');
+  }
+}
+
+async function fulfillPatientRequest(reqId) {
+  try {
+    const res = await fetch(`/api/ngo/patient-requests/${reqId}/fulfill`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Requisition Fulfilled', data.message, 'success');
+      }
+      fetchNgoPatientRequests();
+    } else {
+      alert(data.error || 'Could not mark requisition as fulfilled.');
+    }
+  } catch (err) {
+    alert('Network error marking requisition as fulfilled.');
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+{% endblock %}

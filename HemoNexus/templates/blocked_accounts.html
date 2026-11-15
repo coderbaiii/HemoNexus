@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Blocked Accounts & Safety Controls | HemoNexus{% endblock %}
+
+{% block content %}
+<div class="safety-container">
+  <!-- Page Header -->
+  <div class="page-header d-flex justify-between align-center flex-wrap gap-3 mb-4">
+    <div>
+      <div class="d-flex align-center gap-2">
+        <h1 class="page-title mb-0">Blocked Accounts &amp; User Safety</h1>
+        <span class="badge badge-danger"><i class="fa-solid fa-shield-halved"></i> Harassment Protection</span>
+      </div>
+      <p class="page-subtitle text-muted mt-1">Manage blocked users. Blocked accounts cannot send you donation invitations, outreach requests, or view your matching recommendations.</p>
+    </div>
+    <div class="page-actions d-flex gap-2">
+      <a href="/profile" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left me-1"></i> Back to Profile
+      </a>
+      <button class="btn btn-danger btn-sm" onclick="openBlockModal()">
+        <i class="fa-solid fa-ban me-1"></i> Block a User
+      </button>
+    </div>
+  </div>
+
+  <!-- Safety Rules & Policy Card -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card h-100 p-3 border-0 shadow-sm bg-white">
+        <div class="d-flex align-center gap-3">
+          <div style="width: 2.75rem; height: 2.75rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; background: rgba(225, 29, 72, 0.1); color: var(--crimson);">
+            <i class="fa-solid fa-bell-slash fa-lg"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-ink text-sm">No Unwanted Requests</div>
+            <div class="text-xs text-muted">Blocked users cannot send you blood requests or dispatch alerts.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 p-3 border-0 shadow-sm bg-white">
+        <div class="d-flex align-center gap-3">
+          <div style="width: 2.75rem; height: 2.75rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; background: rgba(14, 165, 233, 0.1); color: #0284c7;">
+            <i class="fa-solid fa-eye-slash fa-lg"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-ink text-sm">Bidirectional Concealment</div>
+            <div class="text-xs text-muted">Neither party will appear in the other's donor recommendation engine.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 p-3 border-0 shadow-sm bg-white">
+        <div class="d-flex align-center gap-3">
+          <div style="width: 2.75rem; height: 2.75rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.1); color: #059669;">
+            <i class="fa-solid fa-user-lock fa-lg"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-ink text-sm">Admin Protection</div>
+            <div class="text-xs text-muted">Platform administrators and compliance staff cannot be blocked.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blocked Accounts List Card -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom p-3 d-flex justify-between align-center">
+      <div class="fw-bold text-ink d-flex align-center gap-2">
+        <i class="fa-solid fa-user-slash text-danger"></i>
+        <span>Currently Blocked Accounts</span>
+      </div>
+      <span class="badge badge-secondary" id="blockedCountBadge">0 Blocked</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="bg-light text-xs text-muted text-uppercase">
+          <tr>
+            <th class="ps-3">Blocked Account</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Reason</th>
+            <th>Blocked On</th>
+            <th class="text-end pe-3">Action</th>
+          </tr>
+        </thead>
+        <tbody id="blockedUsersTableBody">
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">Loading blocked accounts...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Block User -->
+<div class="modal fade" id="blockUserModal" tabindex="-1" aria-hidden="true" style="display: none; background: rgba(15, 23, 42, 0.6);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 0.75rem;">
+      <div class="modal-header border-bottom p-3">
+        <h5 class="modal-title fw-bold text-ink">
+          <i class="fa-solid fa-user-slash text-danger me-2"></i>Block a User Account
+        </h5>
+        <button type="button" class="btn-close" onclick="closeBlockModal()"></button>
+      </div>
+      <form id="blockUserForm" onsubmit="handleBlockUser(event)">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase">User ID to Block *</label>
+            <input type="number" class="form-control" id="targetUserIdInput" required placeholder="Enter User ID (e.g. 5)">
+            <div class="text-xs text-muted mt-1">Specify the numeric ID of the user you want to block.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-xs fw-bold text-muted text-uppercase">Reason for Blocking</label>
+            <select class="form-select" id="blockReasonSelect">
+              <option value="Unwanted contact or harassment">Unwanted contact or harassment</option>
+              <option value="Spam blood requests">Spam or frivolous blood requests</option>
+              <option value="No-show donor behavior">Unreliable or repeatedly unavailable</option>
+              <option value="Other safety concerns">Other safety concerns</option>
+            </select>
+          </div>
+
+          <div class="alert alert-warning p-2 text-xs text-dark mb-0">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            This action immediately severs direct communication and hides mutual recommendations. You can unblock this user anytime from this dashboard.
+          </div>
+        </div>
+        <div class="modal-footer border-top p-3 d-flex justify-between">
+          <button type="button" class="btn btn-outline-secondary" onclick="closeBlockModal()">Cancel</button>
+          <button type="submit" class="btn btn-danger" id="submitBlockBtn">
+            <i class="fa-solid fa-ban me-1"></i> Confirm Block
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadBlockedUsers();
+});
+
+async function loadBlockedUsers() {
+  const tbody = document.getElementById('blockedUsersTableBody');
+  try {
+    const res = await fetch('/api/blocked-users');
+    const data = await res.json();
+    if (data.success) {
+      renderBlockedUsers(data.blocked_users || []);
+      document.getElementById('blockedCountBadge').textContent = `${(data.blocked_users || []).length} Blocked`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">${data.error || 'Failed to load list.'}</td></tr>`;
+    }
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Error connecting to server.</td></tr>`;
+  }
+}
+
+function renderBlockedUsers(users) {
+  const tbody = document.getElementById('blockedUsersTableBody');
+  if (!users || users.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center py-5 text-muted">
+          <i class="fa-solid fa-shield-cat fa-3x mb-3 text-muted"></i>
+          <h5>No Blocked Accounts</h5>
+          <p class="text-sm">You have not blocked any users. Your account safety controls are fully active.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  users.forEach(u => {
+    html += `
+      <tr>
+        <td class="ps-3 fw-bold text-ink">
+          <i class="fa-solid fa-user-xmark text-danger me-2"></i>${escapeHtml(u.blocked_name)}
+        </td>
+        <td class="text-xs text-muted">${escapeHtml(u.blocked_email)}</td>
+        <td><span class="badge bg-light text-muted border text-capitalize">${escapeHtml(u.blocked_role)}</span></td>
+        <td class="text-xs text-muted">${escapeHtml(u.reason || 'General privacy')}</td>
+        <td class="text-xs text-muted">${(u.created_at || '').substring(0, 16)}</td>
+        <td class="text-end pe-3">
+          <button class="btn btn-outline-success btn-sm" onclick="handleUnblockUser(${u.blocked_id}, '${escapeHtml(u.blocked_name)}')">
+            <i class="fa-solid fa-lock-open me-1"></i> Unblock
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function openBlockModal() {
+  document.getElementById('targetUserIdInput').value = '';
+  const modal = document.getElementById('blockUserModal');
+  modal.style.display = 'block';
+  modal.classList.add('show');
+}
+
+function closeBlockModal() {
+  const modal = document.getElementById('blockUserModal');
+  modal.style.display = 'none';
+  modal.classList.remove('show');
+}
+
+async function handleBlockUser(e) {
+  e.preventDefault();
+  const targetId = document.getElementById('targetUserIdInput').value.trim();
+  const reason = document.getElementById('blockReasonSelect').value;
+
+  const btn = document.getElementById('submitBlockBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Blocking...';
+
+  try {
+    const res = await fetch('/api/blocked-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocked_id: targetId, reason: reason })
+    });
+    const result = await res.json();
+    if (result.success) {
+      closeBlockModal();
+      loadBlockedUsers();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('User Blocked', result.message, 'warning');
+      } else {
+        alert(result.message);
+      }
+    } else {
+      alert(result.error || 'Failed to block user.');
+    }
+  } catch (err) {
+    alert('Network error.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-ban me-1"></i> Confirm Block';
+  }
+}
+
+async function handleUnblockUser(blockedId, name) {
+  if (!confirm(`Unblock ${name}? This will restore mutual communication and recommendation visibility.`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/blocked-users/${blockedId}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) {
+      loadBlockedUsers();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Unblocked', result.message, 'success');
+      }
+    } else {
+      alert(result.error || 'Failed to unblock.');
+    }
+  } catch (err) {
+    alert('Network error.');
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+{% endblock %}

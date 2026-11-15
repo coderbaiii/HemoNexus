@@ -22,6 +22,7 @@ let secondsRemaining = 600; // 10 minutes emergency window
 let activeEmergencyRequestId = null;
 let broadcastSubmitted = false;
 let hospitalSearchTimer = null;
+let activeBroadcastMatches = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   const broadcastBtn = document.getElementById('btnTriggerBroadcast');
@@ -292,8 +293,8 @@ const startEmergencyBroadcast = async () => {
       'error'
     );
 
-    // Start 10-min countdown timer
-    startCountdownTimer();
+    // Start 10-min countdown timer (real 10:00 ticking down every second)
+    startCountdownTimer(600);
 
     // 3. GET /api/patient/blood-requests/<id>/matches
     let matches = [];
@@ -304,6 +305,17 @@ const startEmergencyBroadcast = async () => {
       }
     } catch (mErr) {
       console.warn('Could not fetch matches:', mErr);
+    }
+    activeBroadcastMatches = matches;
+
+    // Immediately update "Donors Alerted" with real number of verified compatible donors found
+    const alertedCountEl = document.getElementById('liveAlertedCount');
+    const streamBadge = document.getElementById('streamAlertedBadge');
+    if (alertedCountEl) {
+      alertedCountEl.textContent = `${matches.length} Donor${matches.length === 1 ? '' : 's'}`;
+    }
+    if (streamBadge) {
+      streamBadge.textContent = `${matches.length} Alerted • 0 Accepted`;
     }
 
     // 4. POST /send-request for each match using match.user_id
@@ -324,7 +336,7 @@ const startEmergencyBroadcast = async () => {
     const emptyReason = matches.length === 0
       ? `No compatible verified donors found within ${radius} km radius for ${bloodGroup}. Try expanding search radius.`
       : null;
-    await fetchAndRenderMergedDispatches(emptyReason);
+    await fetchAndRenderMergedDispatches(emptyReason, matches);
 
   } catch (err) {
     console.error('Error during emergency broadcast:', err);
@@ -370,12 +382,17 @@ const formatTimeDisplay = (isoString) => {
  * Show all dispatches for the selected blood group from any request (including Matcher ones),
  * grouped by donor, refreshed every 10s.
  */
-const fetchAndRenderMergedDispatches = async (customEmptyReason = null) => {
+const fetchAndRenderMergedDispatches = async (customEmptyReason = null, directMatches = null) => {
   const bloodGroup = document.getElementById('emergencyBloodGroup')?.value || 'O-';
+  const hospitalName = document.getElementById('emergencyHospitalName')?.value?.trim() || 'Destination Hospital';
   const responseFeed = document.getElementById('emergencyResponseList');
   const alertedCountEl = document.getElementById('liveAlertedCount');
   const responseCountEl = document.getElementById('liveResponseCount');
   const streamBadge = document.getElementById('streamAlertedBadge');
+
+  if (directMatches && Array.isArray(directMatches)) {
+    activeBroadcastMatches = directMatches;
+  }
 
   try {
     const me = await HemoAPI.getCurrentUser().catch(() => null);
@@ -394,9 +411,10 @@ const fetchAndRenderMergedDispatches = async (customEmptyReason = null) => {
           </div>
         `;
       }
-      if (alertedCountEl) alertedCountEl.textContent = '0 Donors';
+      const initialCount = activeBroadcastMatches ? activeBroadcastMatches.length : 0;
+      if (alertedCountEl) alertedCountEl.textContent = `${initialCount} Donor${initialCount === 1 ? '' : 's'}`;
       if (responseCountEl) responseCountEl.textContent = '0';
-      if (streamBadge) streamBadge.textContent = '0 Alerted';
+      if (streamBadge) streamBadge.textContent = `${initialCount} Alerted`;
       return;
     }
 
@@ -410,72 +428,72 @@ const fetchAndRenderMergedDispatches = async (customEmptyReason = null) => {
       return bg === bloodGroup.toUpperCase();
     });
 
-    if (targetRequests.length === 0) {
-      if (alertedCountEl) alertedCountEl.textContent = '0 Donors';
-      if (responseCountEl) responseCountEl.textContent = '0';
-      if (streamBadge) streamBadge.textContent = '0 Alerted';
-
-      if (responseFeed) {
-        const reasonText = customEmptyReason || `No blood requests found for blood group ${bloodGroup}.`;
-        responseFeed.innerHTML = `
-          <div class="empty-state py-4 text-center">
-            <div class="empty-state-icon mb-2"><i class="fa-solid fa-circle-exclamation text-warning fa-2x"></i></div>
-            <h5 class="fw-bold text-slate-900">No Active Dispatches</h5>
-            <p class="text-xs text-muted">${reasonText}</p>
-            <p class="text-xs text-slate-400 mt-1">Transmit a Code-Red Broadcast above or create a request in the Requirement Matcher.</p>
-          </div>
-        `;
-      }
-      return;
-    }
-
-    // 3. GET /api/patient/blood-requests/<id> for each matching request
-    const detailsResults = await Promise.all(
-      targetRequests.map(req => HemoAPI.getRequestDetails(req.id).catch(() => null))
-    );
-
-    // 4. Group all responses by donor
     const donorsMap = new Map();
 
-    detailsResults.forEach(detail => {
-      if (!detail || !detail.success) return;
-      const reqInfo = detail.request || {};
-      const responses = Array.isArray(detail.responses) ? detail.responses : [];
+    // Populate from active broadcast verified compatible matches if available
+    if (activeBroadcastMatches && activeBroadcastMatches.length > 0) {
+      activeBroadcastMatches.forEach(m => {
+        const donorKey = m.user_id || m.donor_id || m.id || m.name || m.full_name;
+        donorsMap.set(donorKey, {
+          donor_id: m.user_id || m.donor_id || m.id,
+          donor_name: m.full_name || m.name || 'Verified Donor',
+          donor_blood_group: m.blood_group || bloodGroup,
+          donor_phone: m.phone || '',
+          status: 'PENDING',
+          latest_time: new Date().toISOString(),
+          request_ids: activeEmergencyRequestId ? [activeEmergencyRequestId] : [],
+          hospital_name: hospitalName
+        });
+      });
+    }
 
-      responses.forEach(resp => {
-        const donorKey = resp.donor_id || resp.user_id || resp.donor_name;
-        const respTime = resp.response_time || resp.created_at;
-        const status = (resp.status || 'PENDING').toUpperCase();
-        const reqId = resp.blood_request_id || reqInfo.id;
+    if (targetRequests.length > 0) {
+      // 3. GET /api/patient/blood-requests/<id> for each matching request
+      const detailsResults = await Promise.all(
+        targetRequests.map(req => HemoAPI.getRequestDetails(req.id).catch(() => null))
+      );
 
-        if (!donorsMap.has(donorKey)) {
-          donorsMap.set(donorKey, {
-            donor_id: resp.donor_id || resp.user_id,
-            donor_name: resp.donor_name || 'Verified Donor',
-            donor_blood_group: resp.donor_blood_group || reqInfo.required_blood_group || bloodGroup,
-            donor_phone: resp.donor_phone || '',
-            status: status,
-            latest_time: respTime,
-            request_ids: reqId ? [reqId] : [],
-            hospital_name: reqInfo.hospital_name || 'Destination Hospital'
-          });
-        } else {
-          const existing = donorsMap.get(donorKey);
-          if (reqId && !existing.request_ids.includes(reqId)) {
-            existing.request_ids.push(reqId);
-          }
-          if (status === 'ACCEPTED') {
-            existing.status = 'ACCEPTED';
-            existing.latest_time = respTime;
-          } else if (existing.status !== 'ACCEPTED') {
-            if (new Date(respTime) > new Date(existing.latest_time)) {
-              existing.status = status;
+      // 4. Merge all responses by donor
+      detailsResults.forEach(detail => {
+        if (!detail || !detail.success) return;
+        const reqInfo = detail.request || {};
+        const responses = Array.isArray(detail.responses) ? detail.responses : [];
+
+        responses.forEach(resp => {
+          const donorKey = resp.donor_id || resp.user_id || resp.donor_name;
+          const respTime = resp.response_time || resp.created_at;
+          const status = (resp.status || 'PENDING').toUpperCase();
+          const reqId = resp.blood_request_id || reqInfo.id;
+
+          if (!donorsMap.has(donorKey)) {
+            donorsMap.set(donorKey, {
+              donor_id: resp.donor_id || resp.user_id,
+              donor_name: resp.donor_name || 'Verified Donor',
+              donor_blood_group: resp.donor_blood_group || reqInfo.required_blood_group || bloodGroup,
+              donor_phone: resp.donor_phone || '',
+              status: status,
+              latest_time: respTime,
+              request_ids: reqId ? [reqId] : [],
+              hospital_name: reqInfo.hospital_name || hospitalName
+            });
+          } else {
+            const existing = donorsMap.get(donorKey);
+            if (reqId && !existing.request_ids.includes(reqId)) {
+              existing.request_ids.push(reqId);
+            }
+            if (status === 'ACCEPTED') {
+              existing.status = 'ACCEPTED';
               existing.latest_time = respTime;
+            } else if (existing.status !== 'ACCEPTED') {
+              if (new Date(respTime) > new Date(existing.latest_time)) {
+                existing.status = status;
+                existing.latest_time = respTime;
+              }
             }
           }
-        }
+        });
       });
-    });
+    }
 
     const groupedDonors = Array.from(donorsMap.values());
 
@@ -486,7 +504,7 @@ const fetchAndRenderMergedDispatches = async (customEmptyReason = null) => {
       return timeB - timeA;
     });
 
-    const donorsAlertedCount = groupedDonors.length;
+    const donorsAlertedCount = Math.max(groupedDonors.length, (activeBroadcastMatches ? activeBroadcastMatches.length : 0));
     const acceptedCount = groupedDonors.filter(r => r.status === 'ACCEPTED').length;
 
     if (alertedCountEl) {
@@ -503,13 +521,15 @@ const fetchAndRenderMergedDispatches = async (customEmptyReason = null) => {
 
     if (groupedDonors.length === 0) {
       const reqIds = targetRequests.map(r => `#REQ-${r.id}`).join(', ');
-      const reasonText = customEmptyReason || `Requirement(s) (${reqIds}) exist for ${bloodGroup}, but no donor dispatches have been transmitted yet.`;
+      const reasonText = customEmptyReason || (targetRequests.length > 0
+        ? `Requirement(s) (${reqIds}) exist for ${bloodGroup}, but no donor dispatches have been transmitted yet.`
+        : `No active blood requests found for blood group ${bloodGroup}.`);
       responseFeed.innerHTML = `
         <div class="empty-state py-4 text-center">
           <div class="empty-state-icon mb-2"><i class="fa-solid fa-satellite-dish text-warning fa-2x animate-pulse-sos"></i></div>
           <h5 class="fw-bold text-slate-900">0 Donors Dispatched</h5>
           <p class="text-xs text-muted">${reasonText}</p>
-          <a href="/match?group=${encodeURIComponent(bloodGroup)}" class="btn btn-outline-primary btn-sm mt-2">
+          <a href="/matching" class="btn btn-outline-primary btn-sm mt-2">
             <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Open Requirement Matcher
           </a>
         </div>
@@ -566,16 +586,24 @@ const fetchAndRenderMergedDispatches = async (customEmptyReason = null) => {
   }
 };
 
-const startCountdownTimer = () => {
+const startCountdownTimer = (initialSeconds = 600) => {
   const timerEl = document.getElementById('emergencyTimer');
   if (!timerEl) return;
 
-  clearInterval(broadcastInterval);
-  secondsRemaining = 600;
+  if (broadcastInterval) {
+    clearInterval(broadcastInterval);
+    broadcastInterval = null;
+  }
+  secondsRemaining = initialSeconds;
+  const initM = String(Math.floor(secondsRemaining / 60)).padStart(2, '0');
+  const initS = String(secondsRemaining % 60).padStart(2, '0');
+  timerEl.textContent = `${initM}:${initS}`;
+
   broadcastInterval = setInterval(() => {
     secondsRemaining--;
     if (secondsRemaining <= 0) {
       clearInterval(broadcastInterval);
+      broadcastInterval = null;
       timerEl.textContent = '00:00';
       return;
     }
@@ -586,6 +614,6 @@ const startCountdownTimer = () => {
 };
 
 window.addEventListener('beforeunload', () => {
-  clearInterval(broadcastInterval);
-  clearInterval(pollInterval);
+  if (broadcastInterval) clearInterval(broadcastInterval);
+  if (pollInterval) clearInterval(pollInterval);
 });

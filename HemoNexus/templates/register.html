@@ -109,7 +109,7 @@
         <!-- Role Toggle Pills -->
         <div class="role-pill-toggle-container mx-auto" role="tablist" aria-label="Registration User Type">
           <button type="button" 
-                  class="role-pill-btn {% if active_role != 'patient' %}active{% endif %}" 
+                  class="role-pill-btn {% if active_role == 'donor' or not active_role %}active{% endif %}" 
                   id="regToggleDonorBtn" 
                   onclick="HemoAuth.switchRegRole('donor')">
             <i class="fa-solid fa-heart-pulse me-1"></i> Donor
@@ -118,7 +118,13 @@
                   class="role-pill-btn {% if active_role == 'patient' %}active{% endif %}" 
                   id="regTogglePatientBtn" 
                   onclick="HemoAuth.switchRegRole('patient')">
-            <i class="fa-solid fa-user-injured me-1"></i> Patient / Requester
+            <i class="fa-solid fa-user-injured me-1"></i> Patient
+          </button>
+          <button type="button" 
+                  class="role-pill-btn {% if active_role == 'ngo' %}active{% endif %}" 
+                  id="regToggleNgoBtn" 
+                  onclick="HemoAuth.switchRegRole('ngo')">
+            <i class="fa-solid fa-building-ngo me-1"></i> NGO
           </button>
         </div>
       </div>
@@ -163,12 +169,21 @@
             <input type="email" class="form-control" name="email" placeholder="name@example.com" required>
           </div>
 
+          <!-- NGO Specific Fields -->
+          <div class="mb-3" id="ngoSpecificFields" style="{% if active_role != 'ngo' %}display: none;{% endif %}">
+            <label class="form-label small fw-semibold">Govt. Blood Center License / NGO Registration Number *</label>
+            <input type="text" class="form-control" name="registrationNumber" id="ngoRegNumberInput" placeholder="e.g. WB-NGO-2026 or e-RaktKosh License #">
+            <div class="form-text text-xs text-muted">
+              <i class="fa-solid fa-shield-halved text-success me-1"></i> Cross-referenced with the official e-RaktKosh national database. Fraudulent credentials are blocked.
+            </div>
+          </div>
+
           <div class="row g-3 mb-3">
-            <div class="col-md-6">
+            <div class="col-md-6" id="bloodGroupContainer" style="{% if active_role == 'ngo' %}display: none;{% endif %}">
               <label class="form-label small fw-semibold">Blood Group *</label>
-              <select class="form-select text-mono" name="bloodGroup" required>
+              <select class="form-select text-mono" name="bloodGroup" id="regBloodGroupSelect">
                 <option value="O-">O Negative (Universal)</option>
-                <option value="O+">O Positive</option>
+                <option value="O+" selected>O Positive</option>
                 <option value="A-">A Negative</option>
                 <option value="A+">A Positive</option>
                 <option value="B-">B Negative</option>
@@ -177,9 +192,9 @@
                 <option value="AB+">AB Positive</option>
               </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6" id="cityContainer">
               <label class="form-label small fw-semibold">City / Area *</label>
-              <input type="text" class="form-control" name="city" placeholder="Mumbai, Andheri West" required>
+              <input type="text" class="form-control" name="city" placeholder="Kolkata, Salt Lake" required>
             </div>
           </div>
 

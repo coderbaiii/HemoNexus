@@ -55,6 +55,26 @@
     </table>
   </div>
 </div>
+
+<!-- Patient NGO Requisitions Stream -->
+<div class="card mb-6" id="patientNgoRequestsCard">
+  <div class="card-header bg-slate-50 d-flex align-center justify-between flex-wrap gap-2">
+    <div>
+      <h3 class="card-title text-ink mb-0"><i class="fa-solid fa-building-ngo text-primary me-2"></i>My Direct Requisitions to Blood NGOs</h3>
+      <p class="card-subtitle text-xs text-muted mb-0">Track blood unit requests sent directly to accredited NGO blood banks and view their dispatched response messages.</p>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" onclick="loadPatientNgoRequests()">
+      <i class="fa-solid fa-rotate-right"></i> Refresh
+    </button>
+  </div>
+  <div class="card-body p-4">
+    <div id="patientNgoRequestsList" class="row g-3">
+      <div class="col-12 text-center py-4 text-muted">
+        <i class="fa-solid fa-spinner fa-spin me-2 text-primary"></i> Checking NGO requisition records...
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -63,6 +83,7 @@ let allRequestsData = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   loadRealRequestsTable();
+  loadPatientNgoRequests();
 });
 
 async function loadRealRequestsTable() {
@@ -256,6 +277,95 @@ function filterRequests(filterType) {
       r.style.display = u === filterType ? '' : 'none';
     }
   });
+}
+async function loadPatientNgoRequests() {
+  const container = document.getElementById('patientNgoRequestsList');
+  if (!container) return;
+  try {
+    const res = await fetch('/api/patient/my-ngo-requests');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.requests)) {
+      renderPatientNgoRequests(data.requests);
+    } else {
+      container.innerHTML = `<div class="col-12 alert alert-danger">${data.error || 'Failed to load NGO requisitions.'}</div>`;
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="col-12 alert alert-danger">Error connecting to server.</div>`;
+  }
+}
+
+function renderPatientNgoRequests(requests) {
+  const container = document.getElementById('patientNgoRequestsList');
+  if (!container) return;
+  if (!requests || requests.length === 0) {
+    container.innerHTML = `
+      <div class="col-12 text-center py-4 text-muted">
+        <i class="fa-solid fa-hand-holding-heart fa-2x mb-2 text-muted"></i>
+        <div class="fw-semibold">No NGO requisitions submitted yet.</div>
+        <p class="text-xs text-muted mb-2">You can request blood directly from accredited organizations in the Smart Matcher.</p>
+        <a href="/match" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> Search NGOs</a>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  requests.forEach(r => {
+    const isPending = (r.status || '').toUpperCase() === 'PENDING';
+    const isAccepted = (r.status || '').toUpperCase() === 'ACCEPTED';
+    const isFulfilled = (r.status || '').toUpperCase() === 'FULFILLED';
+    const isDeclined = (r.status || '').toUpperCase() === 'DECLINED';
+
+    let badgeClass = 'bg-secondary';
+    if (isPending) badgeClass = 'bg-warning text-dark';
+    if (isAccepted) badgeClass = 'bg-info text-dark';
+    if (isFulfilled) badgeClass = 'bg-success';
+    if (isDeclined) badgeClass = 'bg-danger';
+
+    html += `
+      <div class="col-md-6">
+        <div class="card h-100 border shadow-sm" style="border-radius: 0.75rem; border-left: 4px solid #0284c7 !important;">
+          <div class="card-body p-4 d-flex flex-column justify-between">
+            <div>
+              <div class="d-flex justify-between align-start mb-2">
+                <div>
+                  <h5 class="fw-bold text-ink mb-0">${escapeHtml(r.ngo_name)}</h5>
+                  <div class="text-xs text-muted"><i class="fa-solid fa-location-dot me-1 text-crimson"></i> ${escapeHtml(r.ngo_city || 'Kolkata')}</div>
+                </div>
+                <div class="blood-badge" style="background: rgba(225, 29, 72, 0.1); color: var(--crimson); font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 0.4rem;">
+                  ${escapeHtml(r.blood_group)} &bull; ${r.units_needed} Unit(s)
+                </div>
+              </div>
+
+              <div class="p-2 rounded bg-light border text-xs mb-3">
+                <div class="mb-1"><i class="fa-solid fa-hospital me-1 text-primary"></i> <strong>Hospital:</strong> ${escapeHtml(r.hospital_name)}</div>
+                <div class="mb-1"><i class="fa-solid fa-phone me-1 text-teal"></i> <strong>NGO Contact:</strong> ${escapeHtml(r.ngo_phone)} (${escapeHtml(r.contact_person)})</div>
+                <div><i class="fa-solid fa-envelope me-1 text-teal"></i> <strong>Email:</strong> ${escapeHtml(r.ngo_email)}</div>
+              </div>
+
+              ${r.custom_message ? `
+                <div class="alert alert-success p-2 text-xs mb-3">
+                  <strong><i class="fa-solid fa-paper-plane me-1"></i> Message Dispatched From NGO:</strong><br>
+                  ${escapeHtml(r.custom_message)}
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="pt-2 border-top d-flex justify-between align-center">
+              <span class="text-xs text-muted">Status:</span>
+              <span class="badge ${badgeClass}">${escapeHtml(r.status)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 </script>
 {% endblock %}

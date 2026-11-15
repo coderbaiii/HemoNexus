@@ -13,7 +13,7 @@ from backend.database import get_db, query_db, execute_db
 auth_bp = Blueprint("auth", __name__)
 
 EMAIL_REGEX = r"^[\w\.\+\-]+@[a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)+$"
-VALID_ROLES = ("donor", "patient")
+VALID_ROLES = ("donor", "patient", "ngo")
 
 def login_required(f):
     """Decorator ensuring the user is logged into the session."""
@@ -75,13 +75,57 @@ def register():
         
     # 4. Role validation: Users must NOT be able to self-register as admin
     if role not in VALID_ROLES:
-        return jsonify({"success": False, "error": f"Invalid role '{role}'. Self-registration is only allowed for 'donor' or 'patient'."}), 400
+        return jsonify({"success": False, "error": f"Invalid role '{role}'. Self-registration is only allowed for 'donor', 'patient', or 'ngo'."}), 400
 
     conn = get_db()
-    
+
+    # 4a. Check existing user before fraud or registration
+    existing_user = query_db("SELECT id, account_status FROM users WHERE email = ?", (email,), one=True, db=conn)
+    if existing_user and existing_user.get("account_status") == "BLOCKED":
+        return jsonify({
+            "success": False,
+            "error": "Registration Rejected: This identity or email has been permanently blocked due to a fraudulent registration attempt."
+        }), 403
+
+    # 4b. NGO Fraud Verification against Government Registry
+    v_res = None
+    if role == "ngo":
+        from backend.services.ngo_verification import verify_ngo_registration
+        ngo_name = (data.get("ngo_name") or full_name).strip()
+        reg_num = (data.get("registration_number") or "").strip().upper()
+        if not reg_num:
+            return jsonify({"success": False, "error": "Official registration number or Government Blood Center License is required for NGOs."}), 400
+            
+        v_res = verify_ngo_registration(ngo_name, reg_num, email, phone=data.get("phone", ""), city=data.get("city", "Kolkata"))
+        if v_res["is_fraud"]:
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            hashed_block = generate_password_hash(password)
+            if not existing_user:
+                # Create blocked user to record and prevent replay
+                b_uid, _ = execute_db(
+                    "INSERT INTO users (full_name, email, password_hash, role, account_status, created_at, updated_at) VALUES (?, ?, ?, 'ngo', 'BLOCKED', ?, ?)",
+                    (full_name, email, hashed_block, now_iso, now_iso),
+                    db=conn
+                )
+                execute_db(
+                    """INSERT INTO ngo_profiles 
+                       (user_id, ngo_name, registration_number, contact_person, phone, email, verification_status, fraud_status, fraud_reason, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, 'REJECTED', 'BLOCKED', ?, ?, ?)""",
+                    (b_uid, ngo_name, reg_num, full_name, data.get("phone", ""), email, v_res["fraud_reason"], now_iso, now_iso),
+                    db=conn
+                )
+                execute_db(
+                    "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
+                    (b_uid, "FRAUD_NGO_REGISTRATION_BLOCKED", f"Blocked fraudulent NGO {ngo_name} ({reg_num}): {v_res['fraud_reason']}"),
+                    db=conn
+                )
+            return jsonify({
+                "success": False,
+                "error": f"Registration Rejected: {v_res['fraud_reason']} Fraudulent NGO registration attempts are prohibited and blocked by system security."
+            }), 403
+        
     # 5. Duplicate email check
-    existing = query_db("SELECT id FROM users WHERE email = ?", (email,), one=True, db=conn)
-    if existing:
+    if existing_user:
         return jsonify({"success": False, "error": "An account with this email address already exists."}), 409
         
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -89,7 +133,7 @@ def register():
     
     # Insert user
     user_id, _ = execute_db(
-        "INSERT INTO users (full_name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO users (full_name, email, password_hash, role, account_status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)",
         (full_name, email, hashed, role, now, now),
         db=conn
     )
@@ -129,6 +173,22 @@ def register():
         execute_db(
             "INSERT INTO patient_profiles (user_id, phone, location, latitude, longitude, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (user_id, phone, location, lat, lon, now, now),
+            db=conn
+        )
+    elif role == "ngo":
+        ngo_name = (data.get("ngo_name") or f"{full_name} Blood Support Org").strip()
+        reg_num = (data.get("registration_number") or f"NGO-{user_id}-{random.randint(1000, 9999)}").strip().upper()
+        contact_p = (data.get("contact_person") or full_name).strip()
+        phone = (data.get("phone") or "").strip()
+        city = (data.get("city") or "Kolkata").strip()
+        areas = (data.get("service_areas") or "Kolkata Metropolitan Area").strip()
+        v_status = v_res["verification_status"] if v_res else "PENDING"
+        is_govt = 1 if (v_res and v_res.get("is_govt_verified")) else 0
+        execute_db(
+            """INSERT INTO ngo_profiles
+               (user_id, ngo_name, registration_number, contact_person, phone, email, address, city, service_areas, verification_status, govt_verified, fraud_status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CLEAN', ?, ?)""",
+            (user_id, ngo_name, reg_num, contact_p, phone, email, data.get("address", ""), city, areas, v_status, is_govt, now, now),
             db=conn
         )
 
@@ -176,6 +236,9 @@ def login():
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"success": False, "error": "Invalid email or password."}), 401
         
+    if user.get("account_status") == "BLOCKED":
+        return jsonify({"success": False, "error": "This account has been permanently blocked due to fraudulent registration or security violation."}), 403
+        
     # Set Flask session
     session.clear()
     session["user_id"] = user["id"]
@@ -189,6 +252,8 @@ def login():
     profile = None
     if user["role"] == "donor":
         profile = query_db("SELECT * FROM donor_profiles WHERE user_id = ?", (user["id"],), one=True, db=conn)
+        if profile and profile.get("blood_group"):
+            session["blood_group"] = profile["blood_group"]
     elif user["role"] == "patient":
         profile = query_db("SELECT * FROM patient_profiles WHERE user_id = ?", (user["id"],), one=True, db=conn)
         

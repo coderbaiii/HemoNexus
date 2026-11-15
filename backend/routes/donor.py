@@ -249,3 +249,155 @@ def reject_request(response_id):
         "response_id": response_id,
         "status": "REJECTED"
     }), 200
+
+@donor_bp.route("/api/donor/requests/<int:response_id>/complete", methods=["POST"])
+@role_required("donor", "admin")
+def complete_donation_and_update_kyc(response_id):
+    """
+    Once blood donation is completed:
+    1. Mark response and donation record as COMPLETED.
+    2. Automatically update donor's KYC and verification lifecycle (+180 days).
+    3. Increment total donations counter.
+    """
+    donor_user_id = session["user_id"]
+    data = request.get_json(silent=True) or request.form.to_dict()
+    centre = data.get("blood_centre", "HemoNexus Partner Blood Center & Hospital")
+    component = data.get("component", "WHOLE_BLOOD")
+    conn = get_db()
+    
+    resp = query_db(
+        "SELECT * FROM donor_request_responses WHERE id = ? AND donor_id = ?",
+        (response_id, donor_user_id),
+        one=True,
+        db=conn
+    )
+    if not resp:
+        return jsonify({"success": False, "error": "Donation request not found or unauthorized."}), 404
+        
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_iso = now.isoformat()
+    future_180d = (now + datetime.timedelta(days=180)).isoformat()
+    
+    # 1. Update response status to ACCEPTED/COMPLETED
+    execute_db(
+        "UPDATE donor_request_responses SET status = 'ACCEPTED', updated_at = ? WHERE id = ?",
+        (now_iso, response_id),
+        db=conn
+    )
+    
+    # 2. Get donor profile ID for foreign key reference
+    donor_prof = query_db("SELECT id FROM donor_profiles WHERE user_id = ?", (donor_user_id,), one=True, db=conn)
+    donor_profile_id = donor_prof["id"] if donor_prof else donor_user_id
+
+    # 3. Insert into donation_records
+    execute_db(
+        """INSERT INTO donation_records 
+           (donor_id, request_id, blood_centre, donation_date, component, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?)""",
+        (donor_profile_id, resp["blood_request_id"], centre, now_iso, component, now_iso, now_iso),
+        db=conn
+    )
+    
+    # 3. Update donor_profiles with KYC renewal and increment total_donations
+    execute_db(
+        """UPDATE donor_profiles 
+           SET total_donations = COALESCE(total_donations, 0) + 1,
+               last_verified_date = ?,
+               next_verification_date = ?,
+               kyc_status = 'VERIFIED',
+               kyc_updated_at = ?,
+               profile_status = 'ACTIVE',
+               updated_at = ?
+           WHERE user_id = ?""",
+        (now_iso, future_180d, now_iso, now_iso, donor_user_id),
+        db=conn
+    )
+    
+    # 4. Fulfill the blood request if required
+    execute_db(
+        "UPDATE blood_requests SET request_status = 'FULFILLED', updated_at = ? WHERE id = ?",
+        (now_iso, resp["blood_request_id"]),
+        db=conn
+    )
+    
+    # 5. Audit log
+    execute_db(
+        "INSERT INTO audit_logs (user_id, action, details) VALUES (?, ?, ?)",
+        (donor_user_id, "DONATION_COMPLETED_KYC_UPDATED", f"Donation completed for request #{resp['blood_request_id']}. KYC renewed until {future_180d}."),
+        db=conn
+    )
+    
+    return jsonify({
+        "success": True,
+        "message": "Donation completed successfully! Your profile and KYC verification have been renewed for 6 months.",
+        "kyc_status": "VERIFIED",
+        "last_verified_date": now_iso,
+        "next_verification_date": future_180d
+    }), 200
+
+@donor_bp.route("/api/donor/all-incoming-requests", methods=["GET"])
+@role_required("donor")
+def get_all_donor_incoming_requests():
+    """Retrieve all incoming requests for the donor from BOTH Patients and NGOs."""
+    donor_user_id = session["user_id"]
+    conn = get_db()
+    
+    # 1. Requests from Patients (via dispatch)
+    patient_reqs = query_db(
+        """SELECT r.id AS response_id, r.blood_request_id, r.status, r.message,
+                  r.response_time, r.created_at AS requested_at, 'PATIENT' AS source_type,
+                  br.required_blood_group, br.required_units, br.hospital_name,
+                  br.location AS hospital_location, br.urgency, br.request_status,
+                  u.full_name AS requester_name, u.phone AS requester_phone, u.email AS requester_email
+           FROM donor_request_responses r
+           JOIN blood_requests br ON r.blood_request_id = br.id
+           JOIN users u ON br.patient_id = u.id
+           WHERE r.donor_id = ?
+           ORDER BY 
+               CASE r.status WHEN 'PENDING' THEN 1 ELSE 2 END,
+               r.created_at DESC""",
+        (donor_user_id,),
+        db=conn
+    ) or []
+    
+    # 2. Requests from NGOs (via drive outreach)
+    ngo_reqs = query_db(
+        """SELECT ncr.id AS response_id, NULL AS blood_request_id, ncr.status, ncr.message,
+                  ncr.response_time, ncr.created_at AS requested_at, 'NGO' AS source_type,
+                  ncr.required_blood_group, 1 AS required_units, np.ngo_name AS hospital_name,
+                  np.city AS hospital_location, 'URGENT' AS urgency, 'OPEN' AS request_status,
+                  np.ngo_name AS requester_name, np.phone AS requester_phone, np.email AS requester_email
+           FROM ngo_contact_requests ncr
+           JOIN ngo_profiles np ON ncr.ngo_id = np.user_id
+           WHERE ncr.donor_id = ?
+           ORDER BY 
+               CASE ncr.status WHEN 'PENDING' THEN 1 ELSE 2 END,
+               ncr.created_at DESC""",
+        (donor_user_id,),
+        db=conn
+    ) or []
+    
+    return jsonify({
+        "success": True,
+        "patient_requests": patient_reqs,
+        "ngo_requests": ngo_reqs,
+        "total_incoming": len(patient_reqs) + len(ngo_reqs)
+    }), 200
+
+@donor_bp.route("/api/donor/privacy-preference", methods=["POST", "PUT"])
+@role_required("donor")
+def update_privacy_preference():
+    """Allows donor to choose whether their contact details are masked or revealed."""
+    donor_user_id = session["user_id"]
+    data = request.get_json(silent=True) or request.form.to_dict()
+    pref = (data.get("privacy_preference") or "MASKED").strip().upper()
+    if pref not in ("MASKED", "ALWAYS_VISIBLE", "CONSENT_ONLY"):
+        return jsonify({"success": False, "error": "Invalid privacy preference option."}), 400
+        
+    conn = get_db()
+    execute_db(
+        "UPDATE donor_profiles SET privacy_preference = ?, updated_at = ? WHERE user_id = ?",
+        (pref, datetime.datetime.now(datetime.timezone.utc).isoformat(), donor_user_id),
+        db=conn
+    )
+    return jsonify({"success": True, "message": f"Privacy preference set to '{pref}'.", "privacy_preference": pref}), 200

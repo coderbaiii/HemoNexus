@@ -291,10 +291,10 @@
             <span class="role-selector-label">I'm signing in as</span>
             <div class="role-pill-toggle-container mx-auto" role="tablist" aria-label="Sign-in role">
               <button type="button"
-                      class="role-pill-btn {% if active_role != 'patient' %}active{% endif %}"
+                      class="role-pill-btn {% if active_role == 'donor' or not active_role %}active{% endif %}"
                       id="toggleDonorBtn"
                       role="tab"
-                      aria-selected="{% if active_role != 'patient' %}true{% else %}false{% endif %}"
+                      aria-selected="{% if active_role == 'donor' or not active_role %}true{% else %}false{% endif %}"
                       aria-controls="donorPane"
                       onclick="HemoAuth.switchRole('donor')">
                 <i class="fa-solid fa-heart-pulse"></i> Donor
@@ -306,7 +306,16 @@
                       aria-selected="{% if active_role == 'patient' %}true{% else %}false{% endif %}"
                       aria-controls="patientPane"
                       onclick="HemoAuth.switchRole('patient')">
-                <i class="fa-solid fa-user-injured"></i> Patient / Requester
+                <i class="fa-solid fa-user-injured"></i> Patient
+              </button>
+              <button type="button"
+                      class="role-pill-btn {% if active_role == 'ngo' %}active{% endif %}"
+                      id="toggleNgoBtn"
+                      role="tab"
+                      aria-selected="{% if active_role == 'ngo' %}true{% else %}false{% endif %}"
+                      aria-controls="ngoPane"
+                      onclick="HemoAuth.switchRole('ngo')">
+                <i class="fa-solid fa-building-ngo"></i> Blood NGO
               </button>
             </div>
 
@@ -398,6 +407,16 @@
                   <option value="urgent">Urgent Need (Within 6-12 Hours)</option>
                   <option value="routine" selected>Scheduled Surgery / Routine Transfusion</option>
                 </select>
+              </div>
+              <!-- NGO: organization portal indicator -->
+              <div id="ngoFieldSub" class="d-none">
+                <div class="p-2 rounded bg-light border text-xs text-muted d-flex align-center justify-between">
+                  <div>
+                    <i class="fa-solid fa-shield-halved text-primary me-1"></i>
+                    <strong>Accredited NGO Portal:</strong> Authorized coordination &amp; drive outreach.
+                  </div>
+                  <span class="badge bg-primary-subtle text-primary">NGO Access</span>
+                </div>
               </div>
             </div>
 
@@ -750,7 +769,8 @@
   (function() {
     const previews = {
       donor:   'View donation cooldown, availability status, and nearby blood requests.',
-      patient: 'Find compatible donors and create blood requests based on your requirements.'
+      patient: 'Find compatible donors and create blood requests based on your requirements.',
+      ngo:     'Coordinate community blood drives, search eligible donors, and track outreach.'
     };
     const origSwitch = HemoAuth.switchRole;
     document.addEventListener('DOMContentLoaded', function() {
@@ -762,6 +782,7 @@
 
       const donorBtn   = document.getElementById('toggleDonorBtn');
       const patientBtn = document.getElementById('togglePatientBtn');
+      const ngoBtn     = document.getElementById('toggleNgoBtn');
       const previewEl  = document.getElementById('rolePreviewText');
 
       function updatePreview(role) {
@@ -770,6 +791,16 @@
 
       if (donorBtn)   donorBtn.addEventListener('click',   () => updatePreview('donor'));
       if (patientBtn) patientBtn.addEventListener('click', () => updatePreview('patient'));
+      if (ngoBtn)     ngoBtn.addEventListener('click',     () => updatePreview('ngo'));
+
+      const initialRole = "{{ active_role or 'donor' }}";
+      if (initialRole === 'ngo') {
+        HemoAuth.switchRole('ngo');
+        updatePreview('ngo');
+      } else if (initialRole === 'patient') {
+        HemoAuth.switchRole('patient');
+        updatePreview('patient');
+      }
     });
   })();
 </script>

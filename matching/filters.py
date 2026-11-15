@@ -53,16 +53,69 @@ def compute_lifecycle_status(next_verification_dt, current_dt=None, grace_days=3
     else:
         return "INACTIVE"
 
-def filter_by_blood_group(candidates, required_blood_group):
+RBC_COMPATIBILITY = {
+    'O-': {'O-'},
+    'O+': {'O+', 'O-'},
+    'A-': {'A-', 'O-'},
+    'A+': {'A+', 'A-', 'O+', 'O-'},
+    'B-': {'B-', 'O-'},
+    'B+': {'B+', 'B-', 'O+', 'O-'},
+    'AB-': {'AB-', 'A-', 'B-', 'O-'},
+    'AB+': {'AB+', 'AB-', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-'}
+}
+
+PLASMA_COMPATIBILITY = {
+    'AB+': {'AB+', 'AB-', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-'},
+    'AB-': {'AB-', 'A-', 'B-', 'O-'},
+    'A+': {'A+', 'AB+', 'A-', 'AB-'},
+    'A-': {'A-', 'AB-'},
+    'B+': {'B+', 'AB+', 'B-', 'AB-'},
+    'B-': {'B-', 'AB-'},
+    'O+': {'O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'},
+    'O-': {'O-', 'A-', 'B-', 'AB-'}
+}
+
+def is_blood_compatible(donor_group, recipient_group, component="Whole Blood"):
     """
-    Filters donors by requested blood group.
-    MVP uses strict exact blood group matching for discovery.
-    Designed modularly to integrate authorized blood bank compatibility matrices in future.
+    Evaluates physiological blood compatibility according to medical guidance.
+    """
+    d_grp = (donor_group or "").strip().upper()
+    r_grp = (recipient_group or "").strip().upper()
+    if not d_grp or not r_grp:
+        return False
+    if d_grp == r_grp:
+        return True
+    comp = (component or "Whole Blood").strip().lower()
+    if "plasma" in comp:
+        return d_grp in PLASMA_COMPATIBILITY.get(r_grp, {r_grp})
+    return d_grp in RBC_COMPATIBILITY.get(r_grp, {r_grp})
+
+def filter_by_blood_group(candidates, required_blood_group, allow_compatible=False, component="Whole Blood"):
+    """
+    Filters donors by requested blood group and compatibility matrix.
+    If allow_compatible=False, strict exact blood group match.
+    If allow_compatible=True, allows all medically compatible donors.
     """
     if not required_blood_group:
         return []
     req_group = required_blood_group.strip().upper()
-    return [d for d in candidates if (d.get("blood_group") or "").strip().upper() == req_group]
+    valid = []
+    for d in candidates:
+        d_group = (d.get("blood_group") or "").strip().upper()
+        if not allow_compatible:
+            if d_group == req_group:
+                valid.append(d)
+        else:
+            if is_blood_compatible(d_group, req_group, component=component):
+                valid.append(d)
+    return valid
+
+def filter_by_blocked_users(candidates, blocked_ids=None):
+    """Prunes any donor who has blocked the requester or whom the requester blocked."""
+    if not blocked_ids:
+        return candidates
+    blocked_set = set(blocked_ids)
+    return [d for d in candidates if (d.get("user_id") or d.get("donor_id")) not in blocked_set]
 
 def filter_by_active_status(candidates):
     """Filters out any donor whose database profile_status is not 'ACTIVE'."""
@@ -91,25 +144,25 @@ def filter_by_verification_status(candidates, current_dt=None, grace_days=None):
     valid = []
     for d in candidates:
         donor_id = d.get("donor_id") or d.get("id") or d.get("user_id")
-        last_due_str = d.get("last_verified_date") or d.get("next_verification_date")
 
-        if not last_due_str:
+        if d.get("next_verification_date"):
+            next_dt = parse_iso_datetime(d["next_verification_date"])
+        elif d.get("last_verified_date"):
+            last_dt = parse_iso_datetime(d["last_verified_date"])
+            next_dt = last_dt + datetime.timedelta(days=interval_days) if last_dt else None
+        else:
             logger.warning(
-                "Donor %s excluded from matching: verification timestamp is missing.",
+                "Donor %s has UNKNOWN verification status: verification timestamp is missing. Excluded from matching.",
                 donor_id
             )
             continue
 
-        last_dt = parse_iso_datetime(last_due_str)
-        if not last_dt:
+        if not next_dt:
             logger.warning(
-                "Donor %s excluded from matching: invalid verification timestamp '%s'.",
-                donor_id, last_due_str
+                "Donor %s excluded from matching: invalid verification timestamp.",
+                donor_id
             )
             continue
-
-        # Dynamic expiration = last_verified_date + interval
-        next_dt = last_dt + datetime.timedelta(days=interval_days)
 
         status = compute_lifecycle_status(next_dt, current_dt=now, grace_days=grace_days)
         if status == "ACTIVE":

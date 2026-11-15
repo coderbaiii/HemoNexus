@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}My Family - Blood Group Management | HemoNexus{% endblock %}
+
+{% block content %}
+<div class="family-container">
+  <!-- Page Header -->
+  <div class="page-header d-flex justify-between align-center flex-wrap gap-3 mb-4">
+    <div>
+      <div class="d-flex align-center gap-2">
+        <h1 class="page-title mb-0">My Family Blood Group Registry</h1>
+        <span class="badge badge-primary"><i class="fa-solid fa-users"></i> Emergency Safe-List</span>
+      </div>
+      <p class="page-subtitle text-muted mt-1">Manage your family members' vital blood groups for rapid, one-click emergency dispatch.</p>
+    </div>
+    <div class="page-actions d-flex gap-2">
+      <button class="btn btn-primary" onclick="openAddFamilyModal()">
+        <i class="fa-solid fa-user-plus me-1"></i> Add Family Member
+      </button>
+      <a href="/requests/new" class="btn btn-outline-danger">
+        <i class="fa-solid fa-truck-medical me-1"></i> Emergency Blood Request
+      </a>
+    </div>
+  </div>
+
+  <!-- Quick Overview Cards -->
+  <div class="row g-3 mb-4" id="familyOverviewStats">
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 bg-white">
+        <div class="d-flex align-center gap-3">
+          <div class="stat-icon-wrapper stat-icon-primary" style="width: 3rem; height: 3rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; background: rgba(225, 29, 72, 0.1); color: var(--crimson);">
+            <i class="fa-solid fa-heart-pulse fa-lg"></i>
+          </div>
+          <div>
+            <div class="text-xs text-muted fw-semibold text-uppercase">Registered Members</div>
+            <div class="fs-4 fw-bold text-ink" id="totalMembersCount">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 bg-white">
+        <div class="d-flex align-center gap-3">
+          <div class="stat-icon-wrapper stat-icon-warning" style="width: 3rem; height: 3rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; background: rgba(245, 158, 11, 0.1); color: #d97706;">
+            <i class="fa-solid fa-droplet fa-lg"></i>
+          </div>
+          <div>
+            <div class="text-xs text-muted fw-semibold text-uppercase">Unique Blood Groups</div>
+            <div class="fs-4 fw-bold text-ink" id="uniqueBloodGroupsCount">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 bg-white">
+        <div class="d-flex align-center gap-3">
+          <div class="stat-icon-wrapper stat-icon-success" style="width: 3rem; height: 3rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.1); color: #059669;">
+            <i class="fa-solid fa-shield-halved fa-lg"></i>
+          </div>
+          <div>
+            <div class="text-xs text-muted fw-semibold text-uppercase">Active Requirements</div>
+            <div class="fs-4 fw-bold text-ink" id="activeRequirementsCount">0 Active</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Family Members Cards Grid -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom p-3 d-flex justify-between align-center">
+      <div class="fw-bold text-ink d-flex align-center gap-2">
+        <i class="fa-solid fa-people-roof text-crimson"></i>
+        <span>Family Members Roster</span>
+      </div>
+      <div class="text-xs text-muted">Linked to your secure user account</div>
+    </div>
+    <div class="card-body p-4">
+      <div id="familyListContainer" class="row g-3">
+        <!-- Rendered dynamically via JS -->
+        <div class="col-12 text-center py-5 text-muted" id="familyLoadingPlaceholder">
+          <i class="fa-solid fa-spinner fa-spin fa-2x mb-3 text-crimson"></i>
+          <p>Loading family members...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Medical Safety Note -->
+  <div class="alert alert-light border d-flex align-center gap-3 p-3 rounded-lg text-sm text-muted">
+    <i class="fa-solid fa-circle-exclamation text-crimson fa-lg"></i>
+    <div>
+      <strong>Privacy & Safety Notice:</strong> Family records are encrypted and strictly accessible only by your authenticated account. Emergency blood requests pre-fill the selected member's verified blood group for immediate matching.
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add / Edit Family Member -->
+<div class="modal fade" id="familyMemberModal" tabindex="-1" aria-hidden="true" style="display: none; background: rgba(15, 23, 42, 0.6);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 0.75rem;">
+      <div class="modal-header border-bottom p-3">
+        <h5 class="modal-title fw-bold text-ink" id="familyModalTitle">
+          <i class="fa-solid fa-user-plus text-crimson me-2"></i>Add Family Member
+        </h5>
+        <button type="button" class="btn-close" onclick="closeFamilyModal()"></button>
+      </div>
+      <form id="familyMemberForm" onsubmit="handleSaveFamilyMember(event)">
+        <input type="hidden" id="familyMemberId" value="">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label fw-semibold text-xs text-muted text-uppercase">Full Legal Name *</label>
+            <input type="text" class="form-control" id="familyFullName" required placeholder="e.g. Ramesh Kumar">
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold text-xs text-muted text-uppercase">Relationship *</label>
+              <select class="form-select" id="familyRelationship" required>
+                <option value="" disabled selected>Select Relationship</option>
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Brother">Brother</option>
+                <option value="Sister">Sister</option>
+                <option value="Spouse">Spouse</option>
+                <option value="Child">Child</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold text-xs text-muted text-uppercase">Blood Group *</label>
+              <select class="form-select fw-bold text-crimson" id="familyBloodGroup" required>
+                <option value="" disabled selected>Select Blood Group</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold text-xs text-muted text-uppercase">Age (Years)</label>
+              <input type="number" class="form-control" id="familyAge" min="1" max="120" placeholder="e.g. 45">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold text-xs text-muted text-uppercase">Emergency Contact</label>
+              <input type="tel" class="form-control" id="familyContactNumber" placeholder="+91 98765 43210">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold text-xs text-muted text-uppercase">Medical Notes (Optional)</label>
+            <textarea class="form-control" id="familyMedicalNotes" rows="2" placeholder="Allergies, chronic conditions, regular medications..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-top p-3 d-flex justify-between">
+          <button type="button" class="btn btn-outline-secondary" onclick="closeFamilyModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveFamilyBtn">
+            <i class="fa-solid fa-floppy-disk me-1"></i> Save Details
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+let familyMembersData = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadFamilyMembers();
+});
+
+async function loadFamilyMembers() {
+  const container = document.getElementById('familyListContainer');
+  try {
+    const res = await fetch('/api/family-members');
+    const data = await res.get_json ? await res.get_json() : await res.json();
+    if (data.success) {
+      familyMembersData = data.family_members || [];
+      renderFamilyMembers(familyMembersData);
+      updateOverviewStats(familyMembersData);
+    } else {
+      container.innerHTML = `<div class="col-12 alert alert-danger">${data.error || 'Failed to load family members.'}</div>`;
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="col-12 alert alert-danger">Error connecting to server. Please try again.</div>`;
+  }
+}
+
+function updateOverviewStats(members) {
+  document.getElementById('totalMembersCount').textContent = members.length;
+  const groups = new Set(members.map(m => m.blood_group));
+  document.getElementById('uniqueBloodGroupsCount').textContent = groups.size;
+  const activeReqs = members.filter(m => m.has_active_request > 0).length;
+  const activeBadge = document.getElementById('activeRequirementsCount');
+  if (activeReqs > 0) {
+    activeBadge.innerHTML = `<span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${activeReqs} Active</span>`;
+  } else {
+    activeBadge.textContent = 'None Active';
+  }
+}
+
+function renderFamilyMembers(members) {
+  const container = document.getElementById('familyListContainer');
+  if (!members || members.length === 0) {
+    container.innerHTML = `
+      <div class="col-12 text-center py-5 text-muted">
+        <i class="fa-solid fa-people-roof fa-3x mb-3 text-muted"></i>
+        <h5>No Family Members Registered</h5>
+        <p class="text-sm">Add your family members now to ensure rapid one-click emergency blood matching whenever needed.</p>
+        <button class="btn btn-primary btn-sm mt-2" onclick="openAddFamilyModal()">
+          <i class="fa-solid fa-plus me-1"></i> Add First Family Member
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  members.forEach(m => {
+    const hasReq = m.has_active_request > 0;
+    html += `
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 border shadow-sm position-relative" style="border-radius: 0.75rem; border-top: 4px solid var(--crimson) !important;">
+          <div class="card-body p-4 d-flex flex-column justify-between">
+            <div>
+              <div class="d-flex justify-between align-start mb-2">
+                <div>
+                  <h5 class="fw-bold text-ink mb-0">${escapeHtml(m.full_name)}</h5>
+                  <span class="badge bg-light text-muted border text-xs mt-1">${escapeHtml(m.relationship)}</span>
+                  ${m.age ? `<span class="badge bg-light text-muted border text-xs mt-1 ms-1">${m.age} yrs</span>` : ''}
+                </div>
+                <div class="blood-badge text-center" style="background: rgba(225, 29, 72, 0.1); color: var(--crimson); border: 2px solid var(--crimson); border-radius: 0.5rem; padding: 0.25rem 0.6rem; font-weight: 800; font-size: 1.1rem;">
+                  ${escapeHtml(m.blood_group)}
+                </div>
+              </div>
+
+              ${hasReq ? `
+                <div class="alert alert-danger py-1 px-2 text-xs fw-bold mb-2 d-flex align-center gap-1">
+                  <i class="fa-solid fa-bell animate-pulse-sos"></i> Active Emergency Blood Requirement
+                </div>
+              ` : ''}
+
+              <div class="text-xs text-muted mb-2">
+                <div><i class="fa-solid fa-phone me-1"></i> ${m.contact_number ? escapeHtml(m.contact_number) : 'No phone specified'}</div>
+                ${m.medical_notes ? `<div class="mt-1"><i class="fa-solid fa-notes-medical me-1"></i> <em>${escapeHtml(m.medical_notes)}</em></div>` : ''}
+              </div>
+            </div>
+
+            <div class="border-top pt-3 mt-3 d-flex flex-column gap-2">
+              <a href="/requests/new?group=${encodeURIComponent(m.blood_group)}&patient=${encodeURIComponent(m.full_name)}" class="btn btn-emergency btn-sm w-100 text-center text-decoration-none">
+                <i class="fa-solid fa-truck-medical me-1"></i> Emergency Blood Request
+              </a>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm flex-1" onclick="openEditFamilyModal(${m.id})">
+                  <i class="fa-solid fa-pen-to-square me-1"></i> Edit
+                </button>
+                <button class="btn btn-outline-danger btn-sm" onclick="handleDeleteFamilyMember(${m.id}, '${escapeHtml(m.full_name)}')">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function openAddFamilyModal() {
+  document.getElementById('familyModalTitle').innerHTML = '<i class="fa-solid fa-user-plus text-crimson me-2"></i>Add Family Member';
+  document.getElementById('familyMemberId').value = '';
+  document.getElementById('familyFullName').value = '';
+  document.getElementById('familyRelationship').value = '';
+  document.getElementById('familyBloodGroup').value = '';
+  document.getElementById('familyAge').value = '';
+  document.getElementById('familyContactNumber').value = '';
+  document.getElementById('familyMedicalNotes').value = '';
+  const modal = document.getElementById('familyMemberModal');
+  modal.style.display = 'block';
+  modal.classList.add('show');
+}
+
+function openEditFamilyModal(id) {
+  const m = familyMembersData.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('familyModalTitle').innerHTML = '<i class="fa-solid fa-user-pen text-crimson me-2"></i>Edit Family Member';
+  document.getElementById('familyMemberId').value = m.id;
+  document.getElementById('familyFullName').value = m.full_name || '';
+  document.getElementById('familyRelationship').value = m.relationship || '';
+  document.getElementById('familyBloodGroup').value = m.blood_group || '';
+  document.getElementById('familyAge').value = m.age || '';
+  document.getElementById('familyContactNumber').value = m.contact_number || '';
+  document.getElementById('familyMedicalNotes').value = m.medical_notes || '';
+  const modal = document.getElementById('familyMemberModal');
+  modal.style.display = 'block';
+  modal.classList.add('show');
+}
+
+function closeFamilyModal() {
+  const modal = document.getElementById('familyMemberModal');
+  modal.style.display = 'none';
+  modal.classList.remove('show');
+}
+
+async function handleSaveFamilyMember(e) {
+  e.preventDefault();
+  const id = document.getElementById('familyMemberId').value;
+  const payload = {
+    full_name: document.getElementById('familyFullName').value.trim(),
+    relationship: document.getElementById('familyRelationship').value,
+    blood_group: document.getElementById('familyBloodGroup').value,
+    age: document.getElementById('familyAge').value ? parseInt(document.getElementById('familyAge').value) : null,
+    contact_number: document.getElementById('familyContactNumber').value.trim() || null,
+    medical_notes: document.getElementById('familyMedicalNotes').value.trim() || null
+  };
+
+  const btn = document.getElementById('saveFamilyBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Saving...';
+
+  try {
+    const url = id ? `/api/family-members/${id}` : '/api/family-members';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      closeFamilyModal();
+      loadFamilyMembers();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Success', result.message || 'Family details saved.', 'success');
+      } else {
+        alert(result.message || 'Family details saved.');
+      }
+    } else {
+      alert(result.error || 'Failed to save family member.');
+    }
+  } catch (err) {
+    alert('Network error saving details.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Save Details';
+  }
+}
+
+async function handleDeleteFamilyMember(id, name) {
+  if (!confirm(`Are you sure you want to remove ${name} from your family registry?`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/family-members/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) {
+      loadFamilyMembers();
+      if (window.HemoUI && HemoUI.showToast) {
+        HemoUI.showToast('Deleted', result.message, 'info');
+      }
+    } else {
+      alert(result.error || 'Could not delete member.');
+    }
+  } catch (err) {
+    alert('Network error.');
+  }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+{% endblock %}

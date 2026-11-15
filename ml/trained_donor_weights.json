@@ -1,0 +1,37 @@
+{
+  "model_type": "Logistic Regression Classifier",
+  "dataset": "UCI Blood Transfusion Service Center Dataset",
+  "dataset_records": 748,
+  "features": [
+    "Recency (months)",
+    "Frequency (times)",
+    "Monetary (c.c.)",
+    "Time (months)"
+  ],
+  "weights": [
+    -0.7105533182139226,
+    0.36297749403568713,
+    0.3629774940356883,
+    -0.5568683788339629
+  ],
+  "bias": -1.3175751369216058,
+  "means": [
+    9.506684491978609,
+    5.514705882352941,
+    1378.6764705882354,
+    34.282085561497325
+  ],
+  "stds": [
+    8.095395635299203,
+    5.839307123090031,
+    1459.826780772503,
+    24.376714368614156
+  ],
+  "metrics": {
+    "accuracy": 82.67,
+    "precision": 66.67,
+    "recall": 14.29,
+    "f1_score": 23.53,
+    "total_samples": 150
+  }
+}

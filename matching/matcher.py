@@ -42,6 +42,7 @@ except ImportError:
 
 from matching.filters import (
     filter_by_blood_group,
+    filter_by_blocked_users,
     filter_by_active_status,
     filter_by_verification_status,
     filter_by_donation_cooldown,
@@ -92,8 +93,16 @@ def run_matching_pipeline(request_data, candidate_donors, sorting_preference=Non
     sort_pref = sorting_preference or request_data.get("sorting_preference", "BEST_MATCH")
     cooldown_days = request_data.get("donation_cooldown_days")
 
-    # Step 1: Blood Group Filter
-    step1 = filter_by_blood_group(candidate_donors, req_blood)
+    # Step 0: Blocked Users Check (Safety & Privacy)
+    blocked_ids = request_data.get("blocked_ids")
+    step0 = filter_by_blocked_users(candidate_donors, blocked_ids) if blocked_ids else candidate_donors
+    if not step0:
+        return []
+
+    # Step 1: Blood Group Filter (supports compatibility scoring & medical matrices)
+    allow_comp = bool(request_data.get("allow_compatible", False) or (sort_pref in ("COMPATIBILITY", "BLOOD_COMPATIBILITY")))
+    req_comp = request_data.get("required_component") or request_data.get("component") or "Whole Blood"
+    step1 = filter_by_blood_group(step0, req_blood, allow_compatible=allow_comp, component=req_comp)
     if not step1:
         return []
 
@@ -141,7 +150,8 @@ def run_matching_pipeline(request_data, candidate_donors, sorting_preference=Non
         sorting_preference=sort_pref,
         patient_max_dist=max_patient_dist,
         urgency=urgency,
-        average_speed_kmh=Config.DEFAULT_AVERAGE_SPEED_KMH
+        average_speed_kmh=Config.DEFAULT_AVERAGE_SPEED_KMH,
+        req_blood_group=req_blood
     )
 
     # Step 10: Final Results Preparation & Privacy Safeguards
@@ -166,6 +176,9 @@ def run_matching_pipeline(request_data, candidate_donors, sorting_preference=Non
             "match_score": d.get("matching_score"),
             "matching_score": d.get("matching_score"),
             "score_breakdown": d.get("score_breakdown"),
+            "recommendation_reasons": d.get("recommendation_reasons", []),
+            "total_donations": d.get("total_donations", 0),
+            "response_reliability": d.get("response_reliability", 95.0),
             "masked_location": d.get("location", "Kolkata Region"),
             "phone": d.get("phone"),
             "email": d.get("email"),
@@ -189,7 +202,17 @@ def find_matching_donors(blood_request_id, db=None, override_sort=None):
     if not req:
         return []
 
-    # 2. Fetch candidate donors with user accounts
+    req_dict = dict(req)
+    patient_id = req.get("patient_id")
+    if patient_id:
+        blocked = query_db(
+            "SELECT blocked_id FROM blocked_users WHERE blocker_id = ? UNION SELECT blocker_id FROM blocked_users WHERE blocked_id = ?",
+            (patient_id, patient_id),
+            db=conn
+        ) or []
+        req_dict["blocked_ids"] = [b["blocked_id"] for b in blocked]
+
+    # 2. Fetch candidate donors with user accounts and historical metrics
     sql = """
         SELECT d.id AS donor_id, d.user_id, d.blood_group, d.phone, d.location,
                d.latitude, d.longitude, d.availability, d.available_from, d.available_to,
@@ -197,11 +220,14 @@ def find_matching_donors(blood_request_id, db=None, override_sort=None):
                CASE WHEN d.profile_status = 'TEMPORARILY_UNAVAILABLE' THEN 0 ELSE 1 END AS is_available,
                d.last_verified_date, d.next_verification_date,
                (SELECT MAX(donation_date) FROM donation_records WHERE donor_id = d.user_id) AS last_donation_date,
+               (SELECT COUNT(*) FROM donation_records WHERE donor_id = d.user_id) AS total_donations,
+               (SELECT COUNT(*) FROM donor_request_responses WHERE donor_id = d.user_id) AS total_responses,
+               (SELECT COUNT(*) FROM donor_request_responses WHERE donor_id = d.user_id AND status = 'ACCEPTED') AS accepted_responses,
                u.full_name, u.email
         FROM donor_profiles d
         JOIN users u ON d.user_id = u.id
     """
-    raw_donors = query_db(sql, db=conn)
+    raw_donors = query_db(sql, db=conn) or []
     
     # Check existing contact responses
     existing_responses = query_db(
@@ -212,6 +238,10 @@ def find_matching_donors(blood_request_id, db=None, override_sort=None):
     contacted_map = {r["donor_id"]: r for r in (existing_responses or [])}
     
     for d in raw_donors:
+        tot_r = d.get("total_responses") or 0
+        acc_r = d.get("accepted_responses") or 0
+        d["response_reliability"] = round((acc_r / tot_r * 100) if tot_r > 0 else 95.0, 1)
+        
         contact_info = contacted_map.get(d["user_id"])
         if contact_info:
             d["contact_status"] = contact_info["status"]
@@ -221,4 +251,4 @@ def find_matching_donors(blood_request_id, db=None, override_sort=None):
             d["is_already_contacted"] = False
 
     sort_pref = override_sort or req.get("sorting_preference") or req.get("sort_preference", "BEST_MATCH")
-    return run_matching_pipeline(req, raw_donors, sorting_preference=sort_pref)
+    return run_matching_pipeline(req_dict, raw_donors, sorting_preference=sort_pref)

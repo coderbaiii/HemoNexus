@@ -39,6 +39,27 @@
             <span class="badge badge-danger">3 Urgent</span>
           </a>
         </li>
+        <li>
+          <a href="/family" class="sidebar-link {% if active_page == 'family' %}active{% endif %}">
+            <i class="fa-solid fa-people-roof text-crimson"></i>
+            <span class="flex-1">My Family</span>
+          </a>
+        </li>
+        {% if session.get('role') == 'donor' %}
+        <li>
+          <a href="/dashboard" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
+            <i class="fa-solid fa-heart-pulse text-crimson"></i>
+            <span class="flex-1">Incoming Requests</span>
+          </a>
+        </li>
+        {% elif session.get('role') in ('ngo', 'admin') %}
+        <li>
+          <a href="/ngo" class="sidebar-link {% if active_page == 'ngo' %}active{% endif %}">
+            <i class="fa-solid fa-building-ngo text-primary"></i>
+            <span class="flex-1">NGO Operations Portal</span>
+          </a>
+        </li>
+        {% endif %}
       </ul>
     </div>
 
@@ -84,6 +105,18 @@
         </li>
         <li>
           {% if session.get('user_name') %}
+          <a href="/profile" class="sidebar-link {% if active_page == 'profile' %}active{% endif %}">
+            <i class="fa-solid fa-id-badge text-teal"></i>
+            <span>My Profile</span>
+          </a>
+        </li>
+        <li>
+          <a href="/blocked-accounts" class="sidebar-link {% if active_page == 'blocked_accounts' %}active{% endif %}">
+            <i class="fa-solid fa-user-shield text-danger"></i>
+            <span>Blocked Accounts</span>
+          </a>
+        </li>
+        <li>
           <a href="/logout" class="sidebar-link text-danger">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Sign Out ({{ session.get('user_name') }})</span>
