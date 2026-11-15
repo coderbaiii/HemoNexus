@@ -419,8 +419,15 @@ def init_database(db_path=None, seed_demo=True):
     sync_admin_credentials(conn)
 
     cur.close()
-    if db_path:
-        conn.close()
+    try:
+        from flask import has_app_context, g
+        if has_app_context() and "_database" in g and g._database == conn:
+            pass
+        elif db_path:
+            conn.close()
+    except Exception:
+        if db_path:
+            conn.close()
     print("Database schema initialized successfully.")
 
 def seed_data(conn):
@@ -526,7 +533,17 @@ def seed_data(conn):
             )
             patient_ids[p["email"]] = pid
         else:
-            patient_ids[p["email"]] = p_row[0]
+            pid = p_row[0]
+            patient_ids[p["email"]] = pid
+
+        # Seed initial blood request for demo patient
+        cur.execute("SELECT id FROM blood_requests WHERE patient_id = ?", (pid,))
+        if not cur.fetchone():
+            cur.execute("""
+                INSERT INTO blood_requests 
+                (patient_id, required_blood_group, required_units, hospital_name, location, latitude, longitude, preferred_max_distance, required_date_time, urgency, request_status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?)
+            """, (pid, p["req_blood"], p["units"], p["hospital"], p["loc"], p["lat"], p["lon"], p["max_dist"], now_iso, p["urgency"], now_iso, now_iso))
 
 
     # 3. Comprehensive Synthetic Donors across all blood groups & verification states

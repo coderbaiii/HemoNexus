@@ -158,7 +158,7 @@ def create_app(config_class=Config):
     # Ensure database schema is initialized if file doesn't exist
     if app.config.get("DATABASE_PATH") and app.config["DATABASE_PATH"] != ":memory:":
         db_path = Path(app.config["DATABASE_PATH"])
-        if not db_path.exists():
+        if not db_path.exists() or db_path.stat().st_size == 0:
             db_path.parent.mkdir(parents=True, exist_ok=True)
             with app.app_context():
                 init_database(str(db_path), seed_demo=True)
