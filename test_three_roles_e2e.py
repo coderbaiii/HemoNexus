@@ -2,11 +2,13 @@ import sys
 import os
 import json
 
-# Ensure project root is in sys.path
-sys.path.insert(0, r"C:\Users\ASUS\.gemini\antigravity\scratch\HemoNexus")
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.app import create_app
-from backend.database import get_db, query_db
+from backend.database import get_db, query_db, execute_db
 
 app = create_app()
 client = app.test_client()
@@ -55,6 +57,15 @@ legit_payload = {
     "phone": "+91 33 2284 3582",
     "city": "Kolkata"
 }
+
+with app.app_context():
+    db = get_db()
+    existing_u = query_db("SELECT id FROM users WHERE email = ?", (legit_ngo_email,), one=True, db=db)
+    if existing_u:
+        existing_p = query_db("SELECT id FROM ngo_profiles WHERE user_id = ?", (existing_u["id"],), one=True, db=db)
+        if not existing_p:
+            execute_db("DELETE FROM users WHERE id = ?", (existing_u["id"],), db=db)
+
 # Register or login if exists
 res = client.post("/api/register", json=legit_payload)
 if res.status_code == 409: # Already registered

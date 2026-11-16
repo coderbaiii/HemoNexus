@@ -45,6 +45,9 @@ def run_migration():
     if "fraud_reason" not in ngo_cols:
         cur.execute("ALTER TABLE ngo_profiles ADD COLUMN fraud_reason TEXT")
         print("Added fraud_reason to ngo_profiles.")
+    if "city" not in ngo_cols:
+        cur.execute("ALTER TABLE ngo_profiles ADD COLUMN city TEXT DEFAULT 'Kolkata'")
+        print("Added city to ngo_profiles.")
         
     # 4. patient_ngo_requests table
     cur.execute("""

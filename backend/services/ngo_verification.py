@@ -96,7 +96,7 @@ def verify_ngo_registration(ngo_name, registration_number, email, phone="", city
     # Pre-authorized recognized NGO organizations
     recognized_patterns = [
         "red cross", "indian red cross", "lions club", "lions blood",
-        "rotary", "jeevandeep", "hope youth", "lifesavers", "blood care",
+        "rotary", "jeevandeep", "hope youth", "lifesavers",
         "calcutta national medical", "esi blood centre", "dr. b.c. roy"
     ]
     
@@ -117,8 +117,7 @@ def verify_ngo_registration(ngo_name, registration_number, email, phone="", city
             "verification_status": "VERIFIED",
             "govt_center_match": matched_center or {"name": ngo_name, "source": "Official Healthcare Registry"}
         }
-        
-    # Valid new application requiring manual administrative verification
+
     return {
         "is_fraud": False,
         "fraud_reason": None,
